@@ -1,5 +1,7 @@
 print("Welcome to BalanceEngine")
 
+tasks = []
+
 number_of_tasks = int(input("How many tasks do you want to add? "))
 
 for task_number in range(number_of_tasks):
@@ -28,9 +30,29 @@ for task_number in range(number_of_tasks):
     else:
         priority_level = "Low"
 
-    print(f"\nTask added: {task_name}")
-    print(f"Work on this task for {hours_per_day:.1f} hours per day.")
-    print(f"Priority score: {priority_score:.1f}")
-    print(f"Priority level: {priority_level}")
+    task = {
+        "name": task_name,
+        "hours_per_day": hours_per_day,
+        "priority_score": priority_score,
+        "priority_level": priority_level
+    }
 
-print("\nAll tasks have been entered.")
+    tasks.append(task)
+    print(f"{task_name} has been saved.")
+
+if len(tasks) == 0:
+    print("\nNo valid tasks were entered.")
+
+else:
+    tasks.sort(
+        key=lambda task: task["priority_score"],
+        reverse=True
+    )
+
+    print("\n=== YOUR PRIORITY PLAN ===")
+
+    for rank, task in enumerate(tasks, start=1):
+        print(f"\n{rank}. {task['name']}")
+        print(f"   Priority: {task['priority_level']}")
+        print(f"   Score: {task['priority_score']:.1f}")
+        print(f"   Daily work: {task['hours_per_day']:.1f} hours")
