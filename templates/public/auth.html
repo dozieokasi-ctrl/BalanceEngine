@@ -1,4 +1,4 @@
-{% extends 'public/base.html' %}{% block title %}{{ 'Create account' if mode == 'register' else 'Log in' }} · BalanceEngine<script>const zone=document.getElementById('detected-zone');if(zone)zone.value=Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';</script>
+{% extends 'public/base.html' %}{% block title %}{{ 'Create account' if mode == 'register' else 'Log in' }} · BalanceEngine
 {% endblock %}{% block content %}
 <main class="card narrow"><h1>{{ 'Create an account' if mode == 'register' else 'Welcome back' }}</h1><p class="muted">{{ 'This is a small invited beta. The demo is open to everyone.' if mode == 'register' else 'Your private tasks are waiting.' }}</p>
 <form method="post" class="stack"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Email<input name="email" type="email" autocomplete="email" required maxlength="254"></label><label>Password<input name="password" type="password" autocomplete="{{ 'new-password' if mode == 'register' else 'current-password' }}" required {% if mode == 'register' %}minlength="12"{% endif %}></label>

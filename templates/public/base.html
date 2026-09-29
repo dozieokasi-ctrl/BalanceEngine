@@ -5,4 +5,12 @@
 <body><div class="wrap"><header><a class="brand" href="{{ url_for('index') }}"><span class="mark"></span>BalanceEngine <small>beta</small></a>
 <nav><a href="{{ url_for('demo') }}">Try demo</a>{% if current_user %}<a href="{{ url_for('dashboard') }}">My tasks</a><a href="{{ url_for('settings') }}">Settings</a><form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="link">Log out</button></form>{% else %}<a href="{{ url_for('login') }}">Log in</a><a class="button" href="{{ url_for('register') }}">Create account</a>{% endif %}</nav></header>
 {% for category, message in get_flashed_messages(with_categories=true) %}<div class="notice {{ category }}" role="alert">{{ message }}</div>{% endfor %}
-{% block content %}{% endblock %}<footer>Your tasks and Google connections belong to your account.</footer></div></body></html>
+{% block content %}{% endblock %}<footer>Your tasks and Google connections belong to your account.</footer></div>{% if current_user and current_user.timezone == 'UTC' and not current_user.timezone_set %}
+<script>
+(async () => {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!timezone || timezone === 'UTC') return;
+  const result = await fetch({{ url_for('detect_timezone')|tojson }}, {method:'POST',body:new URLSearchParams({timezone,csrf_token:{{ csrf_token|tojson }}})});
+  if (result.ok) location.reload();
+})().catch(() => {});
+</script>{% endif %}</body></html>

@@ -74,8 +74,8 @@
               </div>
             {% endif %}
           </div>
-        {% elif next_break %}<p class="small">No activity in your ideas list fits this break.</p>
-        {% else %}<p class="small">No free break remains in the next seven days.</p>{% endif %}
+        {% elif next_break %}<p class="small">No saved activity fits this break. Add one with +.</p>
+        {% else %}<p class="small">Add your own break ideas with +. Suggestions use only your saved activities.</p>{% endif %}
       {% else %}<div class="notice">{{ calendar_error }}</div>{% endif %}
     </section>
 

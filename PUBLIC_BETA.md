@@ -65,3 +65,12 @@ git push origin main
 ```
 
 Once Render finishes deploying, verify Settings timezone and work windows, task creation/editing, weekly recurrence, batch updates, schedule day navigation, and Calendar display. Sheets remains optional until its Google settings are configured. Personal files from the local dashboard are not automatically imported.
+
+
+## Dashboard fixes update
+
+20 tests pass. Manual task recommendations now use the task creation timestamp instead of a fresh timestamp that could exclude it from ranking. Personal break ideas are no longer shared defaults: signed-in users start with their own saved list; the public demo alone retains samples. Browser timezone detection repairs unset UTC accounts once, and never replaces a manually saved timezone. Event timestamps convert to the selected timezone, and the query covers seven complete local dates. Event cards use Google API colors without tinting; events without their own color inherit the primary calendar color.
+
+For inherited colors, add `https://www.googleapis.com/auth/calendar.calendarlist.readonly` in Google Auth Platform → Data Access, keeping the existing events scope. After deploying this update, use Connect Calendar again to approve both read-only permissions. No new Render variables or callback URLs are needed. Existing tokens continue to read events but may lack permission to read inherited colors until reauthorization. The app still reads the primary calendar only.
+
+If an existing task was entered while the account used the wrong timezone, review and edit its deadline after timezone correction. The app preserves saved deadline instants rather than guessing the originally intended time.

@@ -158,7 +158,37 @@ class HostedFeaturesTests(unittest.TestCase):
         palette=Mock(ok=True);palette.json.return_value={'event':{'11':{'background':'#dc2127'}}}
         response=Mock();response.json.return_value={'items':[{'summary':'Morning class','colorId':'11',
             'start':{'dateTime':'2026-09-29T09:00:00-04:00'},'end':{'dateTime':'2026-09-29T10:00:00-04:00'}}]}
-        with patch('hosted_calendar.requests.get',side_effect=[palette,response]):
+        with patch('hosted_calendar.requests.get',side_effect=[palette,Mock(ok=True,json=lambda:{'backgroundColor':'#0088aa'}),response]):
             events=upcoming_events('token',zone,now)
         self.assertEqual(events[0]['color'],'#dc2127')
         self.assertEqual(events[0]['start'].hour,9)
+
+    def test_new_manual_task_is_recommended_and_defaults_are_private(self):
+        self.register('one@example.com')
+        self.new_task('Recommend this')
+        html = self.client.get('/dashboard').data.decode()
+        self.assertIn('<b>Recommend this</b><span class="score">', html)
+        self.assertNotIn('Review SIE material', html)
+        self.assertNotIn('Stretch for taekwondo', html)
+
+    def test_auto_timezone_preserves_manual_preference_and_is_private(self):
+        self.register('one@example.com')
+        self.assertEqual(self.post('/timezone/detect', {'timezone':'America/New_York'}).status_code,204)
+        self.assertEqual(self.query('SELECT timezone FROM users')[0][0],'America/New_York')
+        self.post('/timezone/detect', {'timezone':'Europe/London'})
+        self.assertEqual(self.query('SELECT timezone FROM users')[0][0],'America/New_York')
+        self.assertEqual(self.post('/timezone/detect', {'timezone':'bad/zone'}).status_code,400)
+
+    def test_calendar_timezone_and_inherited_color(self):
+        from hosted_calendar import upcoming_events
+        from unittest.mock import Mock
+        zone=ZoneInfo('America/New_York')
+        now=datetime(2026,9,29,16,tzinfo=zone)
+        palette=Mock(ok=True,json=lambda:{'event':{}})
+        metadata=Mock(ok=True,json=lambda:{'backgroundColor':'#0088aa'})
+        result=Mock(json=lambda:{'items':[{'summary':'Evening practice',
+            'start':{'dateTime':'2026-09-30T01:00:00Z'},'end':{'dateTime':'2026-09-30T03:00:00Z'}}]})
+        with patch('hosted_calendar.requests.get',side_effect=[palette,metadata,result]):
+            event=upcoming_events('token',zone,now)[0]
+        self.assertEqual((event['start'].day,event['start'].hour),(29,21))
+        self.assertEqual(event['color'],'#0088aa')

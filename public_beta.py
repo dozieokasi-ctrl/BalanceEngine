@@ -92,7 +92,7 @@ def create_app(test_config=None):
         # Additive migrations preserve existing accounts, tasks, and OAuth tokens.
         connection.execute("BEGIN IMMEDIATE")
         for table, columns in {
-            "users": {"work_hours": "TEXT NOT NULL DEFAULT '{}'"},
+            "users": {"work_hours": "TEXT NOT NULL DEFAULT '{}'", "timezone_set": "INTEGER NOT NULL DEFAULT 0"},
             "tasks": {"difficulty": "INTEGER NOT NULL DEFAULT 3", "repeat": "TEXT NOT NULL DEFAULT 'once'",
                       "weekday": "TEXT NOT NULL DEFAULT 'Monday'", "due_time": "TEXT NOT NULL DEFAULT '21:00'",
                       "completed_at": "TEXT", "course": "TEXT NOT NULL DEFAULT ''", "source": "TEXT NOT NULL DEFAULT 'manual'"},
@@ -207,7 +207,7 @@ def create_app(test_config=None):
                     item['completed'], item['completed_at'] = 0, None
                 if item['completed'] and item['completed_at'] and datetime.fromisoformat(item['completed_at']) < week_start:
                     continue
-                item.update(due=due, due_label=due.strftime("%a, %b %d at %I:%M %p"), earliest_start=datetime.combine(due.date(), time.min, now.tzinfo) if item['repeat']=='weekly' else now,
+                item.update(due=due, due_label=due.strftime("%a, %b %d at %I:%M %p"), earliest_start=datetime.combine(due.date(), time.min, now.tzinfo) if item['repeat']=='weekly' else datetime.fromisoformat(item['created_at']).astimezone(local_zone()),
                             repeating=item['repeat']=='weekly', edit_id=item['id'], sheet_task=item['source']=='sheet',
                             priority='High' if item['importance'] >= 4 else 'Medium' if item['importance'] == 3 else 'Low')
                 rows.append(item)
@@ -374,12 +374,24 @@ def create_app(test_config=None):
             if row['id'] in assignment_map:
                 row['earliest_start'] = assignment_map[row['id']]['prep_start']
         custom_ideas = [dict(row) for row in db().execute('SELECT * FROM break_ideas WHERE user_id=?', (g.user['id'],))]
-        context = dashboard_context(rows, events, now, work_hours(), IDEAS+custom_ideas, demo=False,
+        context = dashboard_context(rows, events, now, work_hours(), custom_ideas, demo=False,
                                     calendar_enabled=calendar_enabled, calendar_connected=bool(connection), sheets_connected=bool(sheets_connection))
         context.update(assignments=assignments, sheet_config=dict(config) if config else {}, sheets_error=sheets_error)
         if calendar_error:
             context.update(calendar=None, calendar_error=calendar_error, suggestions=[], free_time_ideas=[], next_break=None)
         return render_template('public/dashboard.html', **context)
+
+    @app.post('/timezone/detect')
+    @login_required
+    def detect_timezone():
+        name = request.form.get('timezone', '')
+        try:
+            ZoneInfo(name)
+        except (ValueError, ZoneInfoNotFoundError):
+            abort(400)
+        with db():
+            db().execute("UPDATE users SET timezone=?,timezone_set=1 WHERE id=? AND timezone_set=0 AND timezone='UTC'", (name, g.user['id']))
+        return ('', 204)
 
     @app.route("/settings", methods=["GET", "POST"])
     @login_required
@@ -408,7 +420,7 @@ def create_app(test_config=None):
                 flash("Use a valid IANA timezone and a work window with start before end.", "error")
             else:
                 with db():
-                    db().execute("UPDATE users SET timezone=?,work_start=?,work_end=?,work_hours=? WHERE id=?",
+                    db().execute("UPDATE users SET timezone=?,work_start=?,work_end=?,work_hours=?,timezone_set=1 WHERE id=?",
                                  (zone_name, start, end, json.dumps(day_hours), g.user["id"]))
                 return redirect(url_for("dashboard"))
         return render_template("public/settings.html", calendar_enabled=calendar_enabled,

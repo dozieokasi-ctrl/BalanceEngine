@@ -7,7 +7,9 @@ import requests
 from cryptography.fernet import Fernet
 
 
-SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly"
+EVENT_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly"
+LIST_SCOPE = "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
+SCOPE = EVENT_SCOPE + " " + LIST_SCOPE
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
@@ -35,7 +37,7 @@ def exchange_code(client_id, client_secret, redirect_uri, code, scope=SCOPE):
         token = response.json()
         if not token.get("refresh_token") or not token.get("access_token"):
             raise CalendarError("Google did not return a reusable connection. Try connecting again.")
-        if scope not in token.get("scope", "").split():
+        if not set(scope.split()).issubset(token.get("scope", "").split()):
             raise CalendarError("Calendar read permission was not granted.")
         return token["refresh_token"]
     except (requests.RequestException, ValueError) as exc:
@@ -64,7 +66,8 @@ def refresh_access_token(client_id, client_secret, refresh_token):
 
 def upcoming_events(access_token, zone, now=None):
     now = now or datetime.now(timezone.utc)
-    end = now + timedelta(days=7)
+    now = now.astimezone(zone)
+    end = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=7)
     params = {
         "timeMin": now.astimezone(zone).replace(hour=0, minute=0, second=0, microsecond=0).isoformat(), "timeMax": end.isoformat(),
         "singleEvents": "true", "orderBy": "startTime", "maxResults": 250,
@@ -72,6 +75,8 @@ def upcoming_events(access_token, zone, now=None):
     }
     events = []
     colors = {}
+    default_color = '#4285f4'
+
     try:
         palette = requests.get("https://www.googleapis.com/calendar/v3/colors",
                                headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
@@ -79,6 +84,16 @@ def upcoming_events(access_token, zone, now=None):
             import re
             colors = {key: value["background"] for key, value in palette.json().get("event", {}).items()
                       if re.fullmatch(r"#[0-9a-fA-F]{6}", value.get("background", ""))}
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        pass
+    try:
+        metadata = requests.get('https://www.googleapis.com/calendar/v3/users/me/calendarList/primary',
+                                headers={'Authorization': f'Bearer {access_token}'}, timeout=10)
+        if metadata.ok:
+            import re
+            candidate = metadata.json().get('backgroundColor', '')
+            if re.fullmatch(r'#[0-9a-fA-F]{6}', candidate):
+                default_color = candidate
     except (requests.RequestException, ValueError, KeyError, TypeError):
         pass
     try:
@@ -97,18 +112,18 @@ def upcoming_events(access_token, zone, now=None):
                     ends = datetime.fromisoformat(end_value["dateTime"].replace("Z", "+00:00"))
                     if begins >= end:
                         continue
-                    events.append({"title": event.get("summary") or "Busy", "start": begins,
-                                   "end": ends, "all_day": False,
+                    events.append({"title": event.get("summary") or "Busy", "start": begins.astimezone(zone),
+                                   "end": ends.astimezone(zone), "all_day": False,
                                    "location": event.get("location", ""),
                                    "free": event.get("transparency") == "transparent",
-                                   "color": colors.get(event.get("colorId"), "#4285f4")})
+                                   "color": colors.get(event.get("colorId"), default_color)})
                 elif "date" in start:
                     begins = datetime.fromisoformat(start["date"]).replace(tzinfo=zone)
-                    events.append({"title": event.get("summary") or "All-day event", "start": begins,
+                    events.append({"title": event.get("summary") or "All-day event", "start": begins.astimezone(zone),
                                    "end": datetime.fromisoformat(end_value.get("date", start["date"])).replace(tzinfo=zone),
                                    "all_day": True, "location": event.get("location", ""),
                                    "free": event.get("transparency") == "transparent",
-                                   "color": colors.get(event.get("colorId"), "#4285f4")})
+                                   "color": colors.get(event.get("colorId"), default_color)})
             if not result.get("nextPageToken"):
                 return sorted(events, key=lambda item: item["start"])
             params["pageToken"] = result["nextPageToken"]
