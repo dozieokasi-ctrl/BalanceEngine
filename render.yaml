@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: balanceengine-beta
+    runtime: docker
+    dockerfilePath: ./Dockerfile.public
+    plan: 0.5c-512mb
+    healthCheckPath: /healthz
+    disk:
+      name: beta-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /app/data
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SIGNUP_CODE
+        sync: false

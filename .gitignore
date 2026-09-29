@@ -1,3 +1,17 @@
 credentials.json
 token.json
 tasks.json
+.env
+instance/
+*.sqlite3*
+sheets_token.json
+sheets_config.json
+weekly_tasks.json
+completed_tasks.json
+completion_dates.json
+break_ideas.json
+.venv/
+.venv-1/
+__pycache__/
+*.pyc
+.DS_Store
