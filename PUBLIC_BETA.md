@@ -1,6 +1,6 @@
-# Hosted beta (no Google access)
+# Hosted beta
 
-This is a separate app from `web_app.py`. The existing personal dashboard and its local Calendar/Sheets tokens are not used by the hosted beta. `/demo` is public and shows disposable examples. Saved tasks require an account; account signup is invitation-only until abuse prevention and email verification are added. Tasks and settings are scoped to each account.
+This is a separate app from `web_app.py`. The existing personal dashboard and its local Calendar/Sheets tokens are not used by the hosted beta. `/demo` is public and shows disposable examples. Saved tasks require an account; account signup is invitation-only until abuse prevention and email verification are added. Tasks, settings, and optional Google Calendar connections are scoped to each account.
 
 ## Run locally
 
@@ -28,8 +28,18 @@ Keep the beta on **one application instance** with a persistent disk. Do not dep
 
 ## Next milestones
 
-1. Google Calendar: separate web OAuth consent, per-user encrypted tokens, reconnect/disconnect flows, and calendar-specific error handling.
-2. Google Sheets: separate optional consent, spreadsheet picker/import review, and per-user assignment/task sync.
-3. Before open registration: verified emails, password reset, shared rate limiting, migrations, monitoring, backups, privacy/support pages, and an appropriate multi-instance database.
+1. Google Sheets: separate optional consent, spreadsheet picker/import review, and per-user assignment/task sync.
+2. Before open registration: verified emails, password reset, shared rate limiting, migrations, monitoring, backups, privacy/support pages, and an appropriate multi-instance database.
+
+## Enable the optional hosted Google Calendar connection
+
+Calendar remains disabled until all four Render environment variables below are set. The app uses a **Web application** OAuth client, not the Desktop client or `credentials.json` used by the local app. Do not commit the client secret, encryption key, or Google tokens.
+
+1. In Google Cloud, enable the **Google Calendar API** in the project you want the hosted site to use. Configure Google Auth Platform branding/consent for **External** users and add the scope `https://www.googleapis.com/auth/calendar.events.readonly`. During Testing, add your own Google email under **Test users**.
+2. Create an OAuth client of type **Web application**. Add exactly `https://YOUR-SERVICE.onrender.com/calendar/callback` under **Authorized redirect URIs** (substitute the actual Render service URL, with no trailing slash). The redirect URI must match exactly. You do not need a JavaScript origin for this server-side flow.
+3. In your Render service **Environment**, set `GOOGLE_CLIENT_ID` to the web client ID, `GOOGLE_CLIENT_SECRET` to its secret, and `PUBLIC_BASE_URL` to `https://YOUR-SERVICE.onrender.com` (no path). Generate a Fernet key locally with `python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'` after installing `requirements-public.txt`, then set `TOKEN_ENCRYPTION_KEY` to that value. Keep this key stable: changing or losing it prevents existing connections from being read. Render deploys the new revision after you push and update the environment.
+4. Sign in to the hosted site. Go to **Settings → Connect Calendar**, select a Google test user, and grant read-only Calendar permission. Your dashboard will show the next seven days from your **primary** calendar. **Disconnect Calendar** removes its saved token from your account and asks Google to revoke it. The demo remains sample-only.
+
+Google's External **Testing** status limits who can connect. Refresh tokens issued in Testing expire after seven days for Calendar scopes, so testers will need to reconnect. Before inviting the public to connect Calendar, complete Google's production publishing/verification and the site's privacy/support requirements. Calendar is display-only here; it does not yet calculate free blocks or sync tasks. Existing local tokens and schedules do not transfer to hosted accounts. Set up and test backups for the persistent database and keep the token encryption key separately recoverable.
 
 Run tests with `BALANCEENGINE_ENV=test python -m unittest discover -s tests` from the repo root after installing requirements.

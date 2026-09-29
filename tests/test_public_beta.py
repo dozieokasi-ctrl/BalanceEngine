@@ -4,6 +4,8 @@ import os
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+from cryptography.fernet import Fernet
 
 os.environ["BALANCEENGINE_ENV"] = "test"
 from public_beta import create_app  # noqa: E402
@@ -82,6 +84,50 @@ class PublicBetaTests(unittest.TestCase):
             self.assertEqual(result.status_code, 200)
         locked = self.post("/login", {"email": "one@example.com", "password": "long-test-password"})
         self.assertEqual(locked.status_code, 429)
+
+    def test_calendar_oauth_state_and_account_isolation(self):
+        self.temp.cleanup()
+        self.temp = tempfile.TemporaryDirectory()
+        self.app = create_app({"TESTING": True, "SECRET_KEY": "test-only-key", "DATA_DIR": self.temp.name,
+                               "SIGNUP_CODE": "invite", "GOOGLE_CLIENT_ID": "client-id",
+                               "GOOGLE_CLIENT_SECRET": "client-secret", "PUBLIC_BASE_URL": "https://example.com",
+                               "TOKEN_ENCRYPTION_KEY": Fernet.generate_key().decode()})
+        self.client = self.app.test_client()
+        self.register("one@example.com")
+        self.assertIn(b"Connect Calendar", self.client.get("/settings").data)
+        start = self.post("/calendar/connect", {})
+        self.assertEqual(start.status_code, 302)
+        self.assertIn("accounts.google.com", start.location)
+        self.assertIn("calendar.events.readonly", start.location)
+        with self.client.session_transaction() as state:
+            oauth_state = state["calendar_oauth"]["state"]
+        invalid = self.client.get("/calendar/callback?state=wrong&code=secret")
+        self.assertEqual(invalid.status_code, 400)
+        with patch("public_beta.exchange_code", return_value="private-refresh-token") as exchange:
+            self.assertEqual(self.client.get("/calendar/callback?state=" + oauth_state + "&code=secret").status_code, 400)
+            self.post("/calendar/connect", {})
+            with self.client.session_transaction() as state:
+                oauth_state = state["calendar_oauth"]["state"]
+            result = self.client.get("/calendar/callback?state=" + oauth_state + "&code=secret")
+            self.assertEqual(result.status_code, 302)
+            exchange.assert_called_once()
+        import sqlite3
+        with sqlite3.connect(os.path.join(self.temp.name, "public_beta.sqlite3")) as connection:
+            encrypted = connection.execute("SELECT encrypted_refresh_token FROM calendar_connections").fetchone()[0]
+        self.assertNotIn("private-refresh-token", encrypted)
+        second = self.app.test_client()
+        self.register("two@example.com", second)
+        self.assertIn(b"Connect Calendar", second.get("/settings").data)
+        with patch("public_beta.refresh_access_token", return_value="access"), \
+             patch("public_beta.upcoming_events", return_value=[{"title": "Private meeting", "start": datetime.now(timezone.utc),
+                                                                  "end": datetime.now(timezone.utc) + timedelta(hours=1),
+                                                                  "all_day": False, "location": "", "free": False}]):
+            self.assertIn(b"Private meeting", self.client.get("/dashboard").data)
+            self.assertNotIn(b"Private meeting", second.get("/dashboard").data)
+        with patch("public_beta.revoke") as revoke:
+            self.post("/calendar/disconnect", {})
+            revoke.assert_called_once_with("private-refresh-token")
+        self.assertIn(b"Connect Calendar", self.client.get("/settings").data)
 
 
 if __name__ == "__main__":

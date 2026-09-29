@@ -12,8 +12,11 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for
+from cryptography.fernet import Fernet, InvalidToken
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from hosted_calendar import (CalendarError, authorization_url, decrypt_token, encrypt_token,
+                             exchange_code, refresh_access_token, revoke, upcoming_events)
 from priority_model import ranked_priorities
 
 
@@ -33,12 +36,25 @@ CREATE INDEX IF NOT EXISTS tasks_by_user ON tasks(user_id, due_utc);
 CREATE TABLE IF NOT EXISTS login_attempts (
   email TEXT PRIMARY KEY, count INTEGER NOT NULL, window_start TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS calendar_connections (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  encrypted_refresh_token TEXT NOT NULL, connected_at TEXT NOT NULL
+);
 """
 
 
 def create_app(test_config=None):
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config.update(test_config or {})
+    calendar_options = {key: app.config.get(key) or os.getenv(key, "") for key in
+                        ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "TOKEN_ENCRYPTION_KEY", "PUBLIC_BASE_URL")}
+    calendar_enabled = all(calendar_options.values())
+    if any(calendar_options.values()) and not calendar_enabled:
+        raise RuntimeError("Calendar setup requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, TOKEN_ENCRYPTION_KEY, and PUBLIC_BASE_URL.")
+    if calendar_enabled:
+        Fernet(calendar_options["TOKEN_ENCRYPTION_KEY"].encode())
+        if not calendar_options["PUBLIC_BASE_URL"].startswith(("https://", "http://localhost:", "http://127.0.0.1:")):
+            raise RuntimeError("PUBLIC_BASE_URL must be HTTPS outside local development.")
     production = not (app.config.get("TESTING") or os.getenv("BALANCEENGINE_ENV") == "development")
     secret = app.config.get("SECRET_KEY") or os.getenv("SECRET_KEY")
     data_dir = Path(app.config.get("DATA_DIR") or os.getenv("DATA_DIR", "instance")).resolve()
@@ -141,6 +157,13 @@ def create_app(test_config=None):
             rows.append(item)
         return rows
 
+    def calendar_connection():
+        return db().execute("SELECT encrypted_refresh_token FROM calendar_connections WHERE user_id=?",
+                            (g.user["id"],)).fetchone()
+
+    def calendar_callback_url():
+        return calendar_options["PUBLIC_BASE_URL"].rstrip("/") + url_for("calendar_callback")
+
     @app.get("/")
     def index():
         return render_template("public/index.html")
@@ -224,9 +247,26 @@ def create_app(test_config=None):
     @login_required
     def dashboard():
         rows = rows_for(g.user["id"])
+        connection = calendar_connection() if calendar_enabled else None
+        calendar_events, calendar_error = [], None
+        if connection:
+            try:
+                refresh_token = decrypt_token(calendar_options["TOKEN_ENCRYPTION_KEY"].encode(),
+                                              connection["encrypted_refresh_token"])
+                access_token = refresh_access_token(calendar_options["GOOGLE_CLIENT_ID"],
+                                                    calendar_options["GOOGLE_CLIENT_SECRET"], refresh_token)
+                calendar_events = upcoming_events(access_token, local_zone())
+                for event in calendar_events:
+                    event["start_label"] = event["start"].astimezone(local_zone()).strftime("%a %b %d, %I:%M %p")
+                    if not event["all_day"]:
+                        event["end_label"] = event["end"].astimezone(local_zone()).strftime("%I:%M %p")
+            except (CalendarError, InvalidToken):
+                calendar_error = "Could not load your calendar. Try again or reconnect it in Settings."
         return render_template("public/dashboard.html", demo=False, tasks=rows,
                                priorities=ranked_priorities(rows, datetime.now(timezone.utc)),
-                               timezone_name=g.user["timezone"])
+                               timezone_name=g.user["timezone"], calendar_enabled=calendar_enabled,
+                               calendar_connected=bool(connection), calendar_events=calendar_events,
+                               calendar_error=calendar_error)
 
     @app.route("/settings", methods=["GET", "POST"])
     @login_required
@@ -247,7 +287,67 @@ def create_app(test_config=None):
                     db().execute("UPDATE users SET timezone=?,work_start=?,work_end=? WHERE id=?",
                                  (zone_name, start, end, g.user["id"]))
                 return redirect(url_for("dashboard"))
-        return render_template("public/settings.html")
+        return render_template("public/settings.html", calendar_enabled=calendar_enabled,
+                               calendar_connected=bool(calendar_connection()) if calendar_enabled else False)
+
+    @app.post("/calendar/connect")
+    @login_required
+    def calendar_connect():
+        if not calendar_enabled:
+            abort(404)
+        state = secrets.token_urlsafe(32)
+        session["calendar_oauth"] = {"state": state, "user_id": g.user["id"],
+                                     "created": datetime.now(timezone.utc).timestamp()}
+        return redirect(authorization_url(calendar_options["GOOGLE_CLIENT_ID"], calendar_callback_url(), state))
+
+    @app.get("/calendar/callback")
+    @login_required
+    def calendar_callback():
+        if not calendar_enabled:
+            abort(404)
+        pending = session.pop("calendar_oauth", None)
+        if (not pending or pending.get("user_id") != g.user["id"]
+                or datetime.now(timezone.utc).timestamp() - pending.get("created", 0) > 600
+                or not hmac.compare_digest(request.args.get("state", ""), pending["state"])):
+            abort(400, "Calendar authorization expired or was invalid. Try connecting again.")
+        if request.args.get("error"):
+            flash("Calendar permission was not granted.", "error")
+            return redirect(url_for("settings"))
+        code = request.args.get("code", "")
+        if not code:
+            abort(400, "Google did not return an authorization code.")
+        try:
+            refresh_token = exchange_code(calendar_options["GOOGLE_CLIENT_ID"],
+                                          calendar_options["GOOGLE_CLIENT_SECRET"], calendar_callback_url(), code)
+        except CalendarError as exc:
+            flash(str(exc), "error")
+        else:
+            encrypted = encrypt_token(calendar_options["TOKEN_ENCRYPTION_KEY"].encode(), refresh_token)
+            with db():
+                db().execute("INSERT INTO calendar_connections (user_id,encrypted_refresh_token,connected_at) VALUES (?,?,?) "
+                             "ON CONFLICT(user_id) DO UPDATE SET encrypted_refresh_token=excluded.encrypted_refresh_token, "
+                             "connected_at=excluded.connected_at",
+                             (g.user["id"], encrypted, datetime.now(timezone.utc).isoformat()))
+            flash("Calendar connected.", "success")
+            return redirect(url_for("dashboard"))
+        return redirect(url_for("settings"))
+
+    @app.post("/calendar/disconnect")
+    @login_required
+    def calendar_disconnect():
+        if not calendar_enabled:
+            abort(404)
+        connection = calendar_connection()
+        with db():
+            db().execute("DELETE FROM calendar_connections WHERE user_id=?", (g.user["id"],))
+        if connection:
+            try:
+                revoke(decrypt_token(calendar_options["TOKEN_ENCRYPTION_KEY"].encode(),
+                                     connection["encrypted_refresh_token"]))
+            except InvalidToken:
+                pass
+        flash("Calendar disconnected from this account.", "success")
+        return redirect(url_for("settings"))
 
     @app.post("/tasks")
     @login_required

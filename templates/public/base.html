@@ -5,4 +5,4 @@
 <body><div class="wrap"><header><a class="brand" href="{{ url_for('index') }}"><span class="mark"></span>BalanceEngine <small>beta</small></a>
 <nav><a href="{{ url_for('demo') }}">Try demo</a>{% if current_user %}<a href="{{ url_for('dashboard') }}">My tasks</a><a href="{{ url_for('settings') }}">Settings</a><form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="link">Log out</button></form>{% else %}<a href="{{ url_for('login') }}">Log in</a><a class="button" href="{{ url_for('register') }}">Create account</a>{% endif %}</nav></header>
 {% for category, message in get_flashed_messages(with_categories=true) %}<div class="notice {{ category }}" role="alert">{{ message }}</div>{% endfor %}
-{% block content %}{% endblock %}<footer>Private tasks. No Google connection in this beta. Your existing local dashboard is unchanged.</footer></div></body></html>
+{% block content %}{% endblock %}<footer>Private tasks. Optional read-only Calendar connection. Your existing local dashboard is unchanged.</footer></div></body></html>
