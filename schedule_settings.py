@@ -7,3 +7,11 @@ WORK_HOURS = {
     "Saturday": ("10:00", "21:00"),
     "Sunday": ("11:00", "19:00"),
 }
+REPEATING_TASKS = [
+    {
+        "name": "Laundry",
+        "weekday": "Sunday",
+        "hours": 1.0,
+        "importance": 3,
+    },
+]
