@@ -1,13 +1,321 @@
-{% extends 'public/base.html' %}{% block title %}{{ 'Sample dashboard' if demo else 'My tasks' }} · BalanceEngine{% endblock %}{% block content %}
-<div class="heading"><div><p class="eyebrow">{{ 'Interactive preview' if demo else 'Your private workspace' }}</p><h1>{{ 'See how it works' if demo else 'Your day at a glance' }}</h1><p class="muted">{{ timezone_name }} · {{ tasks|length }} task{{ '' if tasks|length == 1 else 's' }}</p></div>{% if demo %}<a class="button" href="{{ url_for('register') }}">Create an account to save tasks</a>{% endif %}</div>
-{% if demo %}<div class="notice">Sample tasks only. Nothing on this page is saved, and no Google account is connected.</div>{% endif %}
-<div class="grid"><section class="card"><h2>{{ 'Sample tasks' if demo else 'Upcoming tasks' }}</h2><p class="muted">Only your saved tasks appear here when you sign in.</p><div class="task-list">{% for task in tasks %}<article class="task {% if task.completed %}done{% endif %}"><div class="task-main"><strong>{{ task.name }}</strong><p class="muted">Due {{ task.due_label }} · {{ task.hours }} h · Importance {{ task.importance }}/5</p></div>{% if not demo %}<div class="task-actions"><form method="post" action="{{ url_for('toggle_task', task_id=task.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="small-button">{{ 'Reopen' if task.completed else 'Complete' }}</button></form><a href="{{ url_for('edit_task', task_id=task.id) }}">Edit</a><form method="post" action="{{ url_for('delete_task', task_id=task.id) }}" onsubmit="return confirm('Delete this task?')"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="small-button danger">Delete</button></form></div>{% endif %}</article>{% else %}<p class="muted">No tasks yet. Add your first one.</p>{% endfor %}</div></section>
-<section class="card"><h2>{{ 'How task entry works' if demo else 'Add a task' }}</h2>{% if demo %}<p>Choose a task name, how long you need, its importance, and a deadline. Your own tasks stay in your account.</p><a class="button" href="{{ url_for('register') }}">Start saving tasks</a>{% else %}<form method="post" action="{{ url_for('add_task') }}" class="stack"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Task name<input name="name" placeholder="Study for finance exam" required maxlength="150"></label><div class="two"><label>Hours needed<input name="hours" type="number" min="0.25" max="100" step="0.25" required></label><label>Importance<select name="importance"><option value="3">3 · Medium</option><option value="1">1 · Very low</option><option value="2">2 · Low</option><option value="4">4 · High</option><option value="5">5 · Critical</option></select></label></div><label>Deadline ({{ timezone_name }})<input name="deadline" type="datetime-local" required></label><button class="button">Add task</button></form>{% endif %}</section>
-{% if not demo %}<section class="card full"><h2>Your Google Calendar</h2>
-{% if not calendar_enabled %}<p class="muted">Calendar connection is being set up.</p>
-{% elif not calendar_connected %}<p class="muted">Connect your own calendar to see this week's events.</p><a class="button" href="{{ url_for('settings') }}">Connect Calendar</a>
-{% elif calendar_error %}<p class="notice error">{{ calendar_error }}</p>
-{% else %}<p class="muted">Read-only events from your primary calendar for the next seven days. Times shown in {{ timezone_name }}.</p><div class="calendar-list">{% for event in calendar_events %}<article class="calendar-event"><strong>{{ event.title }}</strong><span>{{ event.start_label }}{% if event.all_day %} · All day{% else %}–{{ event.end_label }}{% endif %}{% if event.location %} · {{ event.location }}{% endif %}{% if event.free %} · Free{% endif %}</span></article>{% else %}<p class="muted">No upcoming events this week.</p>{% endfor %}</div>{% endif %}
-</section>{% endif %}
-<section class="card full"><h2>What to prioritize</h2><p class="muted">An explainable score based on importance, time until due, difficulty, and hours needed. This is guidance, not an AI decision.</p><div class="priority-list">{% for row in priorities[:5] %}<div class="priority"><strong>{{ row.task.name }}</strong><span>{{ row.urgency }}</span><b>{{ row.score }}/100</b></div>{% else %}<p class="muted">Add an unfinished task to see a suggestion.</p>{% endfor %}</div></section></div>
+{% extends 'public/base.html' %}{% block title %}BalanceEngine · Dashboard{% endblock %}{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">{% endblock %}{% block content %}
+  <h1>Your day at a glance</h1>
+  <p class="sub">{{ today_label }} · Tasks and weekly routines · {{ timezone_name }}</p>{% if demo %}<div class="notice">Sample tasks only. Try the schedule controls and swipe through break ideas. Create an account to save your own tasks.</div>{% elif timezone_name == "UTC" %}<div class="notice">Your timezone is UTC. <a href="{{ url_for('settings') }}">Set your local timezone</a> so deadlines and calendar times match your day.</div>{% endif %}{% if not demo and not calendar_connected %}<div class="notice">Availability uses your work hours until you connect Calendar. <a href="{{ url_for('settings') }}">Connect Calendar</a></div>{% endif %}
+
+  {% if error|default(false) %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+
+  <div class="stats">
+    <div class="stat hl"><b>{{ active_count }}</b><span>Tasks to do</span></div>
+    <div class="stat"><b>{{ completed_count }}</b><span>Completed</span></div>
+    <div class="stat"><b>{{ due_this_week }}</b><span>Due in seven days</span></div>
+    <div class="stat"><b>{{ '%.1f h'|format(calendar.today_free_hours) if calendar else '—' }}</b><span>Free for work today</span></div>
+  </div>
+
+  <div class="grid">
+    <section class="card span">
+      <h2>Suggested task times</h2>
+      <p class="hint">Within your work hours and before each deadline. Times use your timezone and each task’s weekly due day.</p>
+      {% if calendar %}
+        {% if suggestions %}
+          <div class="plans">
+            {% for suggestion in suggestions %}
+              <div class="plan">
+                <h3>{{ suggestion.task.name }}</h3>
+                {% if suggestion.task.course %}<p class="small">{{ suggestion.task.course }} · From Google Sheets</p>{% endif %}
+                {% if suggestion.sessions %}
+                  <ul>
+                    {% for start, end in suggestion.sessions %}
+                      <li>{{ start.strftime('%a %b %d, %I:%M %p') }}–{{ end.strftime('%I:%M %p') }}</li>
+                    {% endfor %}
+                  </ul>
+                {% else %}<p class="small">No available time before the deadline.</p>{% endif %}
+                {% if suggestion.hours_short > 0 %}
+                  <p class="short">{{ '%.2f'|format(suggestion.hours_short) }} h could not fit before the deadline.</p>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}<p class="small">No unfinished tasks to schedule.</p>{% endif %}
+      {% else %}<div class="notice">{{ calendar_error }}</div>{% endif %}
+    </section>
+
+    <section class="card span">
+      <div class="heading-row">
+        <h2>For your next break...</h2>
+        <button class="plus-button" type="button" id="idea-add-toggle" aria-label="Add a break idea" aria-expanded="false" aria-controls="idea-add-form">+</button>
+      </div>
+      <form id="idea-add-form" class="idea-form" method="post" action="{{ url_for('add_break_idea') }}" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><fieldset style="display:contents" {% if demo %}disabled{% endif %}>
+        <label>Activity name<input name="name" type="text" maxlength="100" required placeholder="Try a new guitar riff"></label>
+        <div class="fields">
+          <label>Time needed (minutes)<input name="minutes" type="number" min="5" max="240" step="1" required placeholder="20"></label>
+          <label>Category<select name="category"><option>Wellness</option><option>Study</option><option>Career</option><option>Music</option><option>Social</option><option>Other</option></select></label>
+        </div>
+        <label>Note (optional)<input name="note" type="text" maxlength="200" placeholder="Anything you want to remember"></label>
+        <button class="add" type="submit">Save idea</button>
+      </fieldset></form>
+      {% if next_break %}
+        <p class="hint">{{ next_break[0].strftime('%a %b %d, %I:%M %p') }}–{{ next_break[1].strftime('%I:%M %p') }} · Swipe through activities that fit this break.</p>
+      {% else %}<p class="hint">Ideas that fit your next free block after scheduled tasks.</p>{% endif %}
+      {% if calendar %}
+        {% if free_time_ideas %}
+          <div class="idea-carousel" id="idea-carousel" tabindex="0" aria-label="Free time ideas">
+            {% for idea in free_time_ideas %}
+              <div class="idea-slide" {% if not loop.first %}hidden{% endif %}>
+                <h3>{{ idea.name }}</h3>
+                <p class="small">{{ idea.minutes }} min · {{ idea.start.strftime('%a %b %d, %I:%M %p') }}–{{ idea.end.strftime('%I:%M %p') }}</p>
+                {% if idea.note %}<p class="small">{{ idea.note }}</p>{% endif %}
+              </div>
+            {% endfor %}
+            {% if free_time_ideas|length > 1 %}
+              <div class="idea-controls">
+                <button type="button" id="idea-prev" aria-label="Previous idea">← Previous</button>
+                <span id="idea-count" aria-live="polite">1 of {{ free_time_ideas|length }}</span>
+                <button type="button" id="idea-next" aria-label="Next idea">Next →</button>
+              </div>
+            {% endif %}
+          </div>
+        {% elif next_break %}<p class="small">No activity in your ideas list fits this break.</p>
+        {% else %}<p class="small">No free break remains in the next seven days.</p>{% endif %}
+      {% else %}<div class="notice">{{ calendar_error }}</div>{% endif %}
+    </section>
+
+    <section class="card compact-card">
+      <h2>the next event is...</h2>
+      {% if calendar and calendar.next_special_event %}
+        <b>{{ calendar.next_special_event.title }}</b>
+        <p class="hint">{{ calendar.next_special_event.start.strftime('%a, %b %d') }}{% if calendar.next_special_event.all_day %} · All day{% else %} · {{ calendar.next_special_event.start.strftime('%I:%M %p') }}{% endif %}</p>
+      {% elif calendar %}<p class="hint">No upcoming birthdays, holidays, or all-day events this week.</p>
+      {% else %}<p class="hint">Calendar events will appear here once connected.</p>{% endif %}
+    </section>
+
+    <section class="card compact-card">
+      <h2>AI recommendation</h2>
+      <p class="hint">Priority preview using a clear scoring rule. This ranking does not change the schedule yet.</p>
+      {% if priorities %}
+      <div class="priority-result"><b>{{ priorities[0].task.name }}</b><span class="score">{{ priorities[0].score }}/100</span></div>
+      <p class="small">{% if priorities[0].task.course %}{{ priorities[0].task.course }} · {% endif %}{{ priorities[0].urgency }} · Importance {{ priorities[0].task.importance }}/5 · Difficulty {{ priorities[0].task.difficulty }}/5 · {{ priorities[0].task.hours }} h of work</p>
+      {% if priorities|length > 1 %}<p class="small">Next: {{ priorities[1].task.name }} ({{ priorities[1].score }})</p>{% endif %}
+      {% else %}<p class="small">No unfinished tasks are ready to work on.</p>{% endif %}
+      <p class="small">Score: 40% importance, 35% deadline urgency, 15% difficulty, 10% workload.</p>
+    </section>
+
+    <section class="card">
+      <h2>Upcoming tasks</h2>
+      <p class="hint">Choose the tasks you've finished, then press Update.</p>
+      {% if tasks %}
+      <form method="post" action="{{ url_for('update_task_completion') }}" id="completion-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><fieldset style="display:contents" {% if demo %}disabled{% endif %}>
+      <ul class="tasks list-scroll" aria-label="Upcoming tasks, scroll for more">
+        {% for task in tasks %}
+        <li class="task {% if task.completed %}done{% endif %}">
+          <input type="hidden" name="task_id" value="{{ task.id }}">
+          <input class="check" type="checkbox" name="completed" value="{{ task.id }}" {% if task.completed %}checked{% endif %} aria-label="Completed: {{ task.name }}">
+          <div class="t">
+            <b>{{ task.name }}</b>
+            <div class="meta">
+              <span class="pill {{ task.priority|lower }}">{{ task.priority }}</span>
+              {% if task.course %}<span class="pill course-pill">{{ task.course }}</span>{% endif %}
+              <span>Due {{ task.due_label }}</span>
+              <span>· {{ task.hours }} h</span>
+              {% if task.repeating %}<span>· Repeats weekly</span>{% endif %}
+            </div>
+          </div>
+          {% if task.sheet_task %}<div class="task-tools"><span class="small">From Sheets</span>{% if not demo %}<button class="delete-link" type="submit" formaction="{{ url_for('delete_task', task_id=task.id) }}" onclick="return confirm('Delete this preparation task?')">Delete</button>{% endif %}</div>
+          {% elif not demo %}<div class="task-tools"><a class="edit-link" href="{{ url_for('edit_task', task_id=task.edit_id) }}">Edit</a><button class="delete-link" type="submit" formaction="{{ url_for('delete_task', task_id=task.id) }}" onclick="return confirm('Delete this task?')">Delete</button></div>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <div class="task-actions"><button class="add" type="submit">Update tasks</button><span class="small" id="task-changes" aria-live="polite">Select one or more tasks to update.</span></div>
+      </fieldset></form>
+      {% else %}<p class="small">No tasks yet. Add your first one here.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Add a task</h2>
+      <p class="hint">Choose a one-time deadline or a weekly weekday and due time.</p>
+      <form class="task-form" method="post" action="{{ url_for('add_task') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><fieldset style="display:contents" {% if demo %}disabled{% endif %}>
+        <label>Task name<input name="name" type="text" maxlength="150" required placeholder="Study for finance exam"></label>
+        <div class="fields">
+          <label>Hours needed<input name="hours" type="number" min="0.25" step="0.25" required placeholder="2"></label>
+          <label>Importance<select name="importance"><option value="3">3 · Medium</option><option value="1">1 · Low</option><option value="2">2 · Low</option><option value="4">4 · High</option><option value="5">5 · High</option></select></label>
+        </div>
+        <label>Difficulty (1 easy, 5 hard)<select name="difficulty"><option value="3">3 · Moderate</option><option value="1">1 · Very easy</option><option value="2">2 · Easy</option><option value="4">4 · Hard</option><option value="5">5 · Very hard</option></select></label>
+        <label>Repeat<select name="repeat" id="add-repeat"><option value="once">One-time</option><option value="weekly">Weekly</option></select></label>
+        <label id="add-once">Deadline<input name="deadline" type="datetime-local" required></label>
+        <div id="add-weekly" class="fields" hidden>
+          <label>Every<select name="weekday" disabled>{% for weekday in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday') %}<option value="{{ weekday }}">{{ weekday }}</option>{% endfor %}</select></label>
+          <label>Due by<input name="due_time" type="time" value="21:00" disabled></label>
+        </div>
+        <button class="add" type="submit">Add task</button>
+      </fieldset></form>
+    </section>
+
+    <section class="card span">
+      <h2>Assignments from Google Sheets</h2>
+      {% if not demo and not sheets_connected %}<p class="hint">Connect Sheets to import your own assignments.</p><form class="sheet-connect" method="post" action="{{ url_for('sheets_connect') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="add" {% if not calendar_enabled %}disabled{% endif %}>Connect Google Sheets</button></form>{% endif %}
+      <p class="hint">Exam study starts 14 days before it is due; projects start 7 days before, homework 2 days before. Econ exams stay in this list without a study task. New rows load when you refresh the dashboard.</p>
+      <form class="task-form" method="post" action="{{ url_for('configure_sheet') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><fieldset style="display:contents" {% if demo %}disabled{% endif %}>
+        <label>Google Sheets link<input name="url" type="url" required placeholder="https://docs.google.com/spreadsheets/d/..." value="{{ 'https://docs.google.com/spreadsheets/d/' ~ sheet_config.sheet_id ~ '/edit' if sheet_config.sheet_id else '' }}"></label>
+        <div class="fields">
+          <label>Worksheet tab (optional)<input name="tab" type="text" value="{{ sheet_config.tab or '' }}" placeholder="Assignments"></label>
+          <label style="align-self:end"><button class="add" type="submit">{{ 'Update sheet' if sheet_config.sheet_id else 'Connect sheet' }}</button></label>
+        </div>
+      </fieldset></form>
+      {% if sheets_error %}<div class="error" role="alert">{{ sheets_error }}</div>{% endif %}
+      {% if assignments %}
+        <ul class="assignment-list list-scroll" style="margin-top:16px" aria-label="Assignments, scroll for more">
+          {% for assignment in assignments %}
+            <li>
+              <b>{{ assignment.title }}</b>
+              <div class="meta">
+                <span class="pill {{ 'high' if assignment.type == 'Exam' else 'med' if assignment.type == 'Project' else 'low' }}">{{ assignment.type }}</span>
+                {% if assignment.course %}<span>{{ assignment.course }}</span>{% endif %}
+                <span>Due {{ assignment.due.strftime('%a %b %d at %I:%M %p') }}</span>
+                {% if assignment.prep_required %}<span>Prep starts {{ assignment.prep_start.strftime('%b %d') }}</span>
+                {% else %}<span>No study task for Econ exam</span>{% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% elif sheet_config.sheet_id and not sheets_error %}<p class="small">No upcoming incomplete assignments found in this sheet.</p>
+      {% else %}<p class="small">The sheet needs columns named Assignment (or Title) and Due Date. Course, Type, and Status are optional.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2 id="schedule-heading">Today's schedule</h2>
+      <p class="hint">Events from your primary Google Calendar and open time within your work hours</p>
+      {% if calendar %}
+        <div class="schedule-controls">
+          <button type="button" id="schedule-prev" disabled>← Previous</button>
+          <span id="schedule-day-label">{{ calendar.days[0].date.strftime('%A, %b %d') }}</span>
+          <button type="button" id="schedule-next">Next →</button>
+        </div>
+        {% for day in calendar.days %}
+        <div class="schedule-day" data-heading="{{ day.schedule_label }}" data-date="{{ day.date.strftime('%A, %b %d') }}" {% if not loop.first %}hidden{% endif %}>
+        {% if day.timeline %}
+          <div class="schedule-scroll" tabindex="0" aria-label="{{ day.schedule_label }}, scroll for more">
+          <ul class="timeline">
+            {% for item in day.timeline %}
+              <li><time>{{ item.start.strftime('%I:%M %p') }}</time>
+                <div class="event {{ item.kind }}" {% if item.kind == 'calendar' %}style="--event-color:{{ item.color }}"{% endif %}>
+                  <b>{{ item.title }}</b>
+                  <small>{% if item.all_day|default(false) %}All day{% else %}{{ item.start.strftime('%I:%M %p') }}–{{ item.end.strftime('%I:%M %p') }}{% endif %}{% if item.detail %} · {{ item.detail }}{% endif %}</small>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+          </div>
+        {% else %}<p class="small">No calendar events or free work blocks for this day.</p>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}<div class="notice">{{ calendar_error }}</div>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Free time this week</h2>
+      <p class="hint">After events in your primary Google Calendar · today's work window: {{ work_window }}</p>
+      {% if calendar %}
+        <div class="window">{{ '%.1f'|format(calendar.week_free_hours) }} h</div>
+        <p class="small">Available during the next seven days</p>
+        <div class="free-pair">
+          {% for day in calendar.days[:2] %}
+            <div class="free-detail">
+              <b>{{ 'Free time today' if loop.first else 'Free time tomorrow' }}</b>
+              <strong>{{ '%.1f'|format(day.hours) }} h</strong>
+              <small>{{ day.date.strftime('%a, %b %d') }} · {% if day.blocks %}{{ day.blocks|length }} open block{{ 's' if day.blocks|length != 1 else '' }}{% else %}No open blocks{% endif %}</small>
+              {% if day.blocks %}<ul>{% for start, end in day.blocks[:3] %}<li>{{ start.strftime('%I:%M %p') }}–{{ end.strftime('%I:%M %p') }}</li>{% endfor %}{% if day.blocks|length > 3 %}<li>+ {{ day.blocks|length - 3 }} more</li>{% endif %}</ul>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="week">
+          {% for day in calendar.days %}
+            <div class="day">
+              <div class="col"><i style="height:{{ (day.hours / 13 * 100)|round|int }}%"></i></div>
+              {{ day.label }}<br>{{ '%.1f'|format(day.hours) }}h
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}<div class="notice">Your work hours are loaded. Calendar availability will appear after the connection loads.</div>{% endif %}
+    </section>
+  </div>
+<script>
+  const completionForm = document.getElementById('completion-form');
+  if (completionForm) {
+    completionForm.querySelectorAll('input.check').forEach(check => {
+      check.addEventListener('change', () => {
+        check.closest('.task').classList.toggle('done', check.checked);
+        document.getElementById('task-changes').textContent = 'Changes ready to save.';
+      });
+    });
+  }
+  const scheduleDays = [...document.querySelectorAll('.schedule-day')];
+  if (scheduleDays.length) {
+    let selectedDay = 0;
+    const previous = document.getElementById('schedule-prev');
+    const next = document.getElementById('schedule-next');
+    function showSchedule(index) {
+      selectedDay = Math.max(0, Math.min(index, scheduleDays.length - 1));
+      scheduleDays.forEach((day, i) => { day.hidden = i !== selectedDay; });
+      const visible = scheduleDays[selectedDay];
+      document.getElementById('schedule-heading').textContent = visible.dataset.heading;
+      document.getElementById('schedule-day-label').textContent = visible.dataset.date;
+      previous.disabled = selectedDay === 0;
+      next.disabled = selectedDay === scheduleDays.length - 1;
+      visible.querySelector('.schedule-scroll')?.scrollTo(0, 0);
+    }
+    previous.addEventListener('click', () => showSchedule(selectedDay - 1));
+    next.addEventListener('click', () => showSchedule(selectedDay + 1));
+  }
+  const ideaAddToggle = document.getElementById('idea-add-toggle');
+  const ideaAddForm = document.getElementById('idea-add-form');
+  ideaAddToggle.addEventListener('click', () => {
+    ideaAddForm.hidden = !ideaAddForm.hidden;
+    ideaAddToggle.setAttribute('aria-expanded', String(!ideaAddForm.hidden));
+    if (!ideaAddForm.hidden) ideaAddForm.querySelector('input').focus();
+  });
+  const repeatSelect = document.getElementById('add-repeat');
+  function updateAddFrequency() {
+    const weekly = repeatSelect.value === 'weekly';
+    document.getElementById('add-once').hidden = weekly;
+    document.getElementById('add-weekly').hidden = !weekly;
+    document.querySelector('#add-once input').disabled = weekly;
+    document.querySelector('#add-weekly select').disabled = !weekly;
+    document.querySelector('#add-weekly input').disabled = !weekly;
+  }
+  repeatSelect.addEventListener('change', updateAddFrequency);
+  updateAddFrequency();
+  const carousel = document.getElementById('idea-carousel');
+  if (carousel) {
+    const slides = [...carousel.querySelectorAll('.idea-slide')];
+    const count = document.getElementById('idea-count');
+    let current = 0;
+    function showIdea(index) {
+      current = (index + slides.length) % slides.length;
+      slides.forEach((slide, i) => { slide.hidden = i !== current; });
+      if (count) count.textContent = `${current + 1} of ${slides.length}`;
+    }
+    document.getElementById('idea-prev')?.addEventListener('click', () => showIdea(current - 1));
+    document.getElementById('idea-next')?.addEventListener('click', () => showIdea(current + 1));
+    carousel.addEventListener('keydown', event => {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        showIdea(current + (event.key === 'ArrowRight' ? 1 : -1));
+      }
+    });
+    let touchStart = null;
+    carousel.addEventListener('touchstart', event => {
+      const touch = event.changedTouches[0];
+      touchStart = { x: touch.clientX, y: touch.clientY };
+    }, { passive: true });
+    carousel.addEventListener('touchend', event => {
+      if (!touchStart) return;
+      const touch = event.changedTouches[0];
+      const dx = touch.clientX - touchStart.x;
+      const dy = touch.clientY - touchStart.y;
+      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+        showIdea(current + (dx < 0 ? 1 : -1));
+      }
+      touchStart = null;
+    }, { passive: true });
+  }
+</script>
 {% endblock %}

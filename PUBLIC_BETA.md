@@ -14,7 +14,7 @@ Visit `http://127.0.0.1:5051`. In local development, data lives in `instance/pub
 
 ## Deploy the invited beta on Render
 
-The repo includes `render.yaml`, which specifies a paid Docker web service and a 1 GB persistent disk mounted at `/app/data`. Render's free web service does not support persistent disks, so do **not** switch this Blueprint to `free`: doing so would lose saved accounts and tasks. Review Render's current charges before creating the service. This has not yet been deployed.
+The repo includes `render.yaml`, which specifies a paid Docker web service and a 1 GB persistent disk mounted at `/app/data`. Render's free web service does not support persistent disks, so do **not** switch this Blueprint to `free`: doing so would lose saved accounts and tasks. Review Render's current charges before creating the service. Use this configuration for the hosted beta.
 
 1. Put the beta files and `render.yaml` in the GitHub repository; review the diff before pushing. Do not add any local credentials, tokens, or task data.
 2. In Render, choose **New → Blueprint**, connect the GitHub repository, and select its root `render.yaml`. Review the paid service and disk in the creation screen.
@@ -24,11 +24,11 @@ The repo includes `render.yaml`, which specifies a paid Docker web service and a
 
 The Docker build copies only the beta app, templates, style sheet, and priority code. `.dockerignore` additionally excludes credentials, Google tokens, local task files, and environment files from the build context. You can build locally with `docker build -f Dockerfile.public -t balanceengine-beta .` if Docker is installed.
 
-Keep the beta on **one application instance** with a persistent disk. Do not deploy to an ephemeral filesystem, scale to multiple instances, or treat this setup as an unrestricted public signup service. The app rejects production startup if `SECRET_KEY`, `SIGNUP_CODE`, or `DATA_DIR` is missing. Passwords are hashed, state-changing forms use CSRF tokens, cookies are Secure/HttpOnly/SameSite, login attempts are limited per email, and task reads/writes are filtered by account ID. A Render account and the service creation step are still needed before there is a live URL.
+Keep the beta on **one application instance** with a persistent disk. Do not deploy to an ephemeral filesystem, scale to multiple instances, or treat this setup as an unrestricted public signup service. The app rejects production startup if `SECRET_KEY`, `SIGNUP_CODE`, or `DATA_DIR` is missing. Passwords are hashed, state-changing forms use CSRF tokens, cookies are Secure/HttpOnly/SameSite, login attempts are limited per email, and task reads/writes are filtered by account ID. Existing deployments update after the changes are pushed to the connected branch.
 
 ## Next milestones
 
-1. Google Sheets: separate optional consent, spreadsheet picker/import review, and per-user assignment/task sync.
+1. Improve Sheets import with a spreadsheet picker and import review.
 2. Before open registration: verified emails, password reset, shared rate limiting, migrations, monitoring, backups, privacy/support pages, and an appropriate multi-instance database.
 
 ## Enable the optional hosted Google Calendar connection
@@ -40,6 +40,28 @@ Calendar remains disabled until all four Render environment variables below are 
 3. In your Render service **Environment**, set `GOOGLE_CLIENT_ID` to the web client ID, `GOOGLE_CLIENT_SECRET` to its secret, and `PUBLIC_BASE_URL` to `https://YOUR-SERVICE.onrender.com` (no path). Generate a Fernet key locally with `python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'` after installing `requirements-public.txt`, then set `TOKEN_ENCRYPTION_KEY` to that value. Keep this key stable: changing or losing it prevents existing connections from being read. Render deploys the new revision after you push and update the environment.
 4. Sign in to the hosted site. Go to **Settings → Connect Calendar**, select a Google test user, and grant read-only Calendar permission. Your dashboard will show the next seven days from your **primary** calendar. **Disconnect Calendar** removes its saved token from your account and asks Google to revoke it. The demo remains sample-only.
 
-Google's External **Testing** status limits who can connect. Refresh tokens issued in Testing expire after seven days for Calendar scopes, so testers will need to reconnect. Before inviting the public to connect Calendar, complete Google's production publishing/verification and the site's privacy/support requirements. Calendar is display-only here; it does not yet calculate free blocks or sync tasks. Existing local tokens and schedules do not transfer to hosted accounts. Set up and test backups for the persistent database and keep the token encryption key separately recoverable.
+Google's External **Testing** status limits who can connect. Refresh tokens issued in Testing expire after seven days for Calendar scopes, so testers will need to reconnect. Before inviting the public to connect Calendar, complete Google's production publishing/verification and the site's privacy/support requirements. Calendar is read-only. Its busy events are used to calculate free work blocks and suggested task times; no events are written back to Google. Existing local tokens and schedules do not transfer to hosted accounts. Set up and test backups for the persistent database and keep the token encryption key separately recoverable.
 
 Run tests with `BALANCEENGINE_ENV=test python -m unittest discover -s tests` from the repo root after installing requirements.
+
+
+## Full dashboard update
+
+This update brings the local dashboard layout into hosted accounts: suggested task sessions, break carousel and custom ideas, priority scoring, weekly tasks and editing, batch completion, seven-day schedule navigation, Google event colors, and today/tomorrow free-time summaries. Each user sets their timezone and daily work windows in Settings. Existing accounts and encrypted Calendar connections are preserved; keep all existing production secrets unchanged.
+
+### Optional Sheets setup
+
+The separate Sheets connection also needs the Google Sheets API enabled, the `https://www.googleapis.com/auth/spreadsheets.readonly` consent scope, and an additional authorized redirect URI on the existing Web OAuth client: `https://YOUR-SERVICE.onrender.com/sheets/callback`. Do not replace the Calendar callback. No new Render environment variables are needed. Connect Sheets, then enter your assignment spreadsheet link and optional tab on the dashboard. Columns: Assignment (or Title), Due Date, and optionally Course, Type, Status. Dates accept ISO dates or MM/DD/YYYY. Preparation tasks follow the local rules: exams 14 days, projects 7 days, homework 2 days; Economics exams do not create study tasks. This personal rule is retained for parity and should become a per-account preference before a broader launch.
+
+### Apply this update on your Mac
+
+Extract the update ZIP into `~/BalanceEngine`, activate your existing virtual environment, install `requirements-public.txt`, and run `BALANCEENGINE_ENV=test python -m unittest discover -s tests` (17 tests). Stage only the package files listed below, review with `git diff --cached --name-only`, then commit and push. Never stage credentials, tokens, local JSON data, or databases.
+
+```sh
+git add public_beta.py hosted_calendar.py hosted_dashboard.py hosted_sheets.py assignments_service.py priority_model.py task_scheduler.py free_time_ideas.py requirements-public.txt Dockerfile.public PUBLIC_BETA.md static/public.css static/dashboard.css templates/public tests/test_public_beta.py tests/test_hosted_features.py
+git diff --cached --check
+git commit -m "Restore full dashboard for hosted accounts"
+git push origin main
+```
+
+Once Render finishes deploying, verify Settings timezone and work windows, task creation/editing, weekly recurrence, batch updates, schedule day navigation, and Calendar display. Sheets remains optional until its Google settings are configured. Personal files from the local dashboard are not automatically imported.

@@ -2,9 +2,9 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY requirements-public.txt .
 RUN pip install --no-cache-dir -r requirements-public.txt
-COPY public_beta.py hosted_calendar.py priority_model.py ./
+COPY public_beta.py hosted_calendar.py hosted_dashboard.py hosted_sheets.py assignments_service.py priority_model.py task_scheduler.py free_time_ideas.py ./
 COPY templates/public/ ./templates/public/
-COPY static/public.css ./static/public.css
+COPY static/ ./static/
 RUN useradd --create-home --uid 10001 beta && mkdir -p /app/data && chown beta:beta /app/data
 USER beta
 ENV PYTHONUNBUFFERED=1

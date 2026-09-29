@@ -63,7 +63,9 @@ class PublicBetaTests(unittest.TestCase):
         self.assertEqual(self.post(f"/tasks/{task_id}/delete", {}, other).status_code, 404)
         self.assertIn(b"Private assignment", self.client.get("/dashboard").data)
         self.post(f"/tasks/{task_id}/toggle", {})
-        self.assertIn(b"Reopen", self.client.get("/dashboard").data)
+        with sqlite3.connect(os.path.join(self.temp.name, "public_beta.sqlite3")) as db:
+            self.assertEqual(db.execute("SELECT completed FROM tasks WHERE id=?", (task_id,)).fetchone()[0], 1)
+        self.assertIn(b'class="task done"', self.client.get("/dashboard").data)
         self.post(f"/tasks/{task_id}/delete", {})
         self.assertNotIn(b"Private assignment", self.client.get("/dashboard").data)
 

@@ -51,13 +51,13 @@ def fetch_rows(sheet_id, tab=""):
     return result.get("values", [])
 
 
-def due_datetime(raw):
+def due_datetime(raw, zone=LOCAL_TZ):
     text = str(raw).strip()
     try:
         parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
         if len(text) == 10:
             parsed = datetime.combine(parsed.date(), time(23, 59))
-        return parsed.replace(tzinfo=LOCAL_TZ) if parsed.tzinfo is None else parsed.astimezone(LOCAL_TZ)
+        return parsed.replace(tzinfo=zone) if parsed.tzinfo is None else parsed.astimezone(zone)
     except ValueError:
         pass
     for pattern in ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M", "%m/%d/%Y", "%m/%d/%y"):
@@ -65,7 +65,7 @@ def due_datetime(raw):
             parsed = datetime.strptime(text, pattern)
             if pattern in ("%m/%d/%Y", "%m/%d/%y"):
                 parsed = datetime.combine(parsed.date(), time(23, 59))
-            return parsed.replace(tzinfo=LOCAL_TZ)
+            return parsed.replace(tzinfo=zone)
         except ValueError:
             continue
     raise ValueError(f"Unsupported due date: {text}")
@@ -87,11 +87,11 @@ def is_econ_course(course):
     return bool(re.search(r"\b(?:economics|econ(?:[\s-]*\d{3,4})?)\b", course, re.I))
 
 
-def parse_rows(rows, sheet_id, tab="", now=None):
+def parse_rows(rows, sheet_id, tab="", now=None, zone=LOCAL_TZ):
     """Map a header row and return dated, incomplete assignments."""
     if not rows:
         return []
-    now = now or datetime.now(LOCAL_TZ)
+    now = now or datetime.now(zone)
     headers = [re.sub(r"[^a-z0-9]", "", str(cell).lower()) for cell in rows[0]]
     aliases = {
         "title": {"assignment", "assignmentname", "title", "name", "task"},
@@ -119,7 +119,7 @@ def parse_rows(rows, sheet_id, tab="", now=None):
         if value("status").lower() in ("done", "complete", "completed", "yes", "true", "submitted"):
             continue
         try:
-            due = due_datetime(due_text)
+            due = due_datetime(due_text, zone)
         except ValueError as exc:
             raise ValueError(f"Row {row_number}: {exc}") from exc
         if due <= now:
@@ -136,7 +136,7 @@ def parse_rows(rows, sheet_id, tab="", now=None):
             "id": f"sheet:{digest}", "title": title, "course": course,
             "type": kind, "due": due, "prep_required": prep_required,
             "prep_start": datetime.combine(
-                due.date() - timedelta(days=LEAD_DAYS[kind]), time.min, LOCAL_TZ
+                due.date() - timedelta(days=LEAD_DAYS[kind]), time.min, zone
             ),
             "prep_hours": PREP_HOURS[kind], "importance": PRIORITY[kind],
         })
