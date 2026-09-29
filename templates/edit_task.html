@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Edit task – BalanceEngine</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0f1220;--card:#181c30;--ink:#eef0fa;--mute:#98a0bf;--line:#2a2f4a;--brand:#8b8bf5}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,-apple-system,"Segoe UI",Arial,sans-serif}
+    main{max-width:620px;margin:48px auto;padding:0 16px}h1{font-size:26px}p{color:var(--mute)}
+    form{display:grid;gap:16px;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:18px}
+    label{display:grid;gap:6px;font-size:13px;font-weight:600}input,select{width:100%;min-width:0;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit}
+    .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}[hidden]{display:none!important}
+    button{padding:11px 16px;background:var(--brand);color:#111426;border:0;border-radius:10px;font:inherit;font-weight:700;cursor:pointer}
+    a{color:var(--brand)}.error{color:#f08083}
+    form.delete-form{margin-top:14px;padding:0;border:0;background:none}
+    .delete-form button{background:#42191c;color:#f08083;border:1px solid #9c3b40}
+    @media(max-width:550px){.fields{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main>
+  <a href="{{ url_for('home') }}">← Back to dashboard</a>
+  <h1>Edit task</h1>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post">
+    <label>Task name<input name="name" type="text" value="{{ task.name }}" required maxlength="150"></label>
+    <div class="fields">
+      <label>Hours needed<input name="hours" type="number" min="0.25" step="0.25" value="{{ task.hours }}" required></label>
+      <label>Importance<select name="importance">{% for number in range(1,6) %}<option value="{{ number }}" {% if number == task.importance|int %}selected{% endif %}>{{ number }}</option>{% endfor %}</select></label>
+    </div>
+    <label>Difficulty (1 easy, 5 hard)<select name="difficulty">{% for number in range(1,6) %}<option value="{{ number }}" {% if number == task.get('difficulty', 3)|int %}selected{% endif %}>{{ number }}</option>{% endfor %}</select></label>
+    <label>Repeat<select name="repeat" id="edit-repeat"><option value="once" {% if not is_weekly %}selected{% endif %}>One-time</option><option value="weekly" {% if is_weekly %}selected{% endif %}>Weekly</option></select></label>
+    <label id="edit-once">Deadline<input name="deadline" type="datetime-local" value="{{ task.deadline[:16] if not is_weekly else '' }}" required></label>
+    <div id="edit-weekly" class="fields" hidden>
+      <label>Every<select name="weekday" disabled>{% for weekday in weekdays %}<option value="{{ weekday }}" {% if is_weekly and weekday == task.weekday %}selected{% endif %}>{{ weekday }}</option>{% endfor %}</select></label>
+      <label>Due by<input name="due_time" type="time" value="{{ task.due_time or '23:59' if is_weekly else '21:00' }}" disabled></label>
+    </div>
+    <button type="submit">Save changes</button>
+  </form>
+  <form class="delete-form" method="post" action="{{ url_for('delete_task', task_id=task.id) }}" onsubmit="return confirm('Delete this task{% if is_weekly %} and all future weekly occurrences{% endif %}?')">
+    <button type="submit">Delete task{% if is_weekly %} and future repeats{% endif %}</button>
+  </form>
+</main>
+<script>
+  const repeatSelect = document.getElementById('edit-repeat');
+  function updateFrequency() {
+    const weekly = repeatSelect.value === 'weekly';
+    document.getElementById('edit-once').hidden = weekly;
+    document.getElementById('edit-weekly').hidden = !weekly;
+    document.querySelector('#edit-once input').disabled = weekly;
+    document.querySelector('#edit-weekly select').disabled = !weekly;
+    document.querySelector('#edit-weekly input').disabled = !weekly;
+  }
+  repeatSelect.addEventListener('change', updateFrequency);
+  updateFrequency();
+</script>
+</body>
+</html>

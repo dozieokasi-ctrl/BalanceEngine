@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BalanceEngine – Student Dashboard</title>
+  <style>
+    :root{--bg:#f4f6fb;--card:#fff;--ink:#1b2033;--mute:#6b7390;--line:#e6e9f2;--brand:#5b5bd6;--brand2:#e9e9fb;--free:#10b981;--high:#e5484d;--high-bg:#fdeaeb;--med:#d97706;--med-bg:#fdf1de;--low:#0f9d76;--low-bg:#e3f7ef}
+    @media(prefers-color-scheme:dark){:root{--bg:#0f1220;--card:#181c30;--ink:#eef0fa;--mute:#98a0bf;--line:#2a2f4a;--brand:#8b8bf5;--brand2:#25264a;--high-bg:#42191c;--med-bg:#3f2d10;--low-bg:#0f3327}}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+    .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px}
+    header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:20px}
+    .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+    .logo i{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--brand),#22c1c3);display:inline-block}
+    h1{font-size:26px;margin:14px 0 2px;letter-spacing:-.02em}
+    .sub,.hint{color:var(--mute)}.sub{margin:0}.hint{font-size:13px;margin:0 0 16px}
+    .sync{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);padding:7px 12px;border-radius:999px;font-size:13px;color:var(--mute)}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr}
+    .span{grid-column:1/-1}
+    @media(min-width:900px){.grid{grid-template-columns:1.15fr 1fr}}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 1px 2px rgba(20,25,60,.04)}
+    .card h2{font-size:16px;margin:0 0 4px}
+    .stats{display:grid;gap:12px;grid-template-columns:repeat(2,1fr);margin:18px 0 16px}
+    @media(min-width:700px){.stats{grid-template-columns:repeat(4,1fr)}}
+    .stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+    .stat b{display:block;font-size:24px;letter-spacing:-.02em}.stat span{color:var(--mute);font-size:13px}
+    .stat.hl{background:linear-gradient(135deg,var(--brand),#7c5cf0);color:white;border:0}.stat.hl span{color:#e4e4ff}
+    .tasks{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+    .task{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:14px}
+    .task .t{flex:1;min-width:0}.task b{font-size:14px}.task.done b{text-decoration:line-through;color:var(--mute)}
+    .edit-link{font-size:12px;color:var(--brand);text-decoration:none;white-space:nowrap}
+    .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:12px;color:var(--mute);align-items:center}
+    .pill{font-weight:600;padding:2px 9px;border-radius:999px;font-size:11px}
+    .course-pill{background:var(--brand2);color:var(--brand)}
+    .high{background:var(--high-bg);color:var(--high)}.med{background:var(--med-bg);color:var(--med)}.low{background:var(--low-bg);color:var(--low)}
+    input.check{width:20px;height:20px;min-width:20px;margin:2px 0 0;padding:0;accent-color:var(--brand);cursor:pointer}
+    .list-scroll{max-height:390px;overflow-y:auto;padding-right:8px;scrollbar-color:var(--line) transparent}
+    .task-actions{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+    form.task-form{display:grid;gap:12px}.fields{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    label{display:grid;gap:5px;font-size:13px;font-weight:600}
+    [hidden]{display:none!important}
+    input,select{min-width:0;width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);color:var(--ink);font:inherit;color-scheme:light dark}
+    button.add{background:var(--brand);color:white;border:0;border-radius:10px;padding:10px 15px;font:inherit;font-weight:600;cursor:pointer}
+    .notice{padding:12px 14px;border-radius:10px;background:var(--brand2);color:var(--ink)}
+    .error{padding:12px 14px;border-radius:10px;background:var(--high-bg);color:var(--high);margin:16px 0}
+    .window{font-size:26px;font-weight:700;margin:4px 0}.small{font-size:13px;color:var(--mute)}
+    .week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:16px}
+    .day{text-align:center;color:var(--mute);font-size:12px}
+    .col{height:90px;background:var(--brand2);border-radius:8px;display:flex;flex-direction:column-reverse;overflow:hidden;margin-bottom:6px}
+    .col i{display:block;background:var(--free)}
+    .timeline{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+    .timeline li{display:grid;grid-template-columns:70px 1fr;align-items:start;gap:10px}
+    .timeline time{color:var(--mute);font-size:13px;padding-top:10px}
+    .event{padding:10px 12px;border-radius:12px;border-left:4px solid #3b82f6;background:var(--brand2)}
+    .event.calendar{border-color:var(--event-color);background:linear-gradient(115deg,color-mix(in srgb,var(--event-color) 22%,var(--card)),color-mix(in srgb,var(--event-color) 5%,var(--card)))}
+    .event.free{border-color:var(--free);border-style:dashed;border-left-style:solid;background:linear-gradient(115deg,color-mix(in srgb,var(--free) 14%,var(--card)),var(--card))}
+    .event b{display:block;font-size:14px;font-weight:500}.event small{color:var(--mute)}
+    .schedule-scroll{max-height:520px;overflow-y:auto;padding-right:8px;scrollbar-color:var(--line) transparent}
+    .schedule-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0}
+    .schedule-controls button{border:1px solid var(--line);border-radius:10px;background:var(--brand2);color:var(--ink);padding:8px 12px;font:inherit;cursor:pointer}
+    .schedule-controls button:disabled{opacity:.45;cursor:default}
+    .schedule-controls span{font-size:13px;color:var(--mute);text-align:center}
+    .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+    .plan{padding:14px;border:1px solid var(--line);border-radius:14px}
+    .plan h3{font-size:14px;margin:0 0 8px}
+    .plan ul{margin:0;padding-left:18px;font-size:13px}
+    .plan li{margin:4px 0}
+    .short{color:var(--high);font-size:12px;margin:8px 0 0}
+    .idea-carousel{touch-action:pan-y}
+    .idea-slide{padding:18px;border:1px solid var(--line);border-radius:14px;min-height:105px}
+    .idea-slide[hidden]{display:none}
+    .idea-slide h3{font-size:17px;margin:0 0 8px}
+    .idea-slide p{margin:0}
+    .idea-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+    .idea-controls button{border:1px solid var(--line);border-radius:10px;background:var(--brand2);color:var(--ink);padding:8px 14px;font:inherit;cursor:pointer}
+    .idea-controls span{font-size:13px;color:var(--mute)}
+    .heading-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .plus-button{border:1px solid var(--line);border-radius:10px;background:var(--brand2);color:var(--ink);padding:5px 11px;font:inherit;font-size:20px;cursor:pointer}
+    .idea-form{display:grid;gap:10px;padding:14px;border:1px solid var(--line);border-radius:12px;margin:12px 0}
+    .assignment-list{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+    .assignment-list li{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+    .assignment-list b{display:block;font-size:14px;font-weight:600}
+    .compact-card{padding:16px 20px}
+    .compact-card .hint{margin:4px 0 0}
+    .priority-result{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin:12px 0 6px}
+    .priority-result b{font-size:15px}.score{font-size:20px;color:var(--brand);font-weight:700;white-space:nowrap}
+    .free-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+    .free-detail{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--brand2)}
+    .free-detail b{display:block;font-size:14px}.free-detail strong{display:block;font-size:21px;margin:3px 0}
+    .free-detail small{color:var(--mute)}
+    .free-detail ul{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:var(--mute)}
+    @media(max-width:550px){.fields{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><i aria-hidden="true"></i>BalanceEngine</div>
+    <span class="sync">Local task dashboard</span>
+  </header>
+  <h1>Your day at a glance</h1>
+  <p class="sub">{{ today_label }} · Tasks and weekly routines</p>
+
+  {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+
+  <div class="stats">
+    <div class="stat hl"><b>{{ active_count }}</b><span>Tasks to do</span></div>
+    <div class="stat"><b>{{ completed_count }}</b><span>Completed</span></div>
+    <div class="stat"><b>{{ due_this_week }}</b><span>Due in seven days</span></div>
+    <div class="stat"><b>{{ '%.1f h'|format(calendar.today_free_hours) if calendar else '—' }}</b><span>Free for work today</span></div>
+  </div>
+
+  <div class="grid">
+    <section class="card span">
+      <h2>Suggested task times</h2>
+      <p class="hint">Within your work hours and before each deadline. Sunday laundry stays on Sunday.</p>
+      {% if calendar %}
+        {% if suggestions %}
+          <div class="plans">
+            {% for suggestion in suggestions %}
+              <div class="plan">
+                <h3>{{ suggestion.task.name }}</h3>
+                {% if suggestion.task.course %}<p class="small">{{ suggestion.task.course }} · From Google Sheets</p>{% endif %}
+                {% if suggestion.sessions %}
+                  <ul>
+                    {% for start, end in suggestion.sessions %}
+                      <li>{{ start.strftime('%a %b %d, %I:%M %p') }}–{{ end.strftime('%I:%M %p') }}</li>
+                    {% endfor %}
+                  </ul>
+                {% else %}<p class="small">No available time before the deadline.</p>{% endif %}
+                {% if suggestion.hours_short > 0 %}
+                  <p class="short">{{ '%.2f'|format(suggestion.hours_short) }} h could not fit before the deadline.</p>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}<p class="small">No unfinished tasks to schedule.</p>{% endif %}
+      {% else %}<div class="notice">{{ calendar_error }}</div>{% endif %}
+    </section>
+
+    <section class="card span">
+      <div class="heading-row">
+        <h2>For your next break...</h2>
+        <button class="plus-button" type="button" id="idea-add-toggle" aria-label="Add a break idea" aria-expanded="false" aria-controls="idea-add-form">+</button>
+      </div>
+      <form id="idea-add-form" class="idea-form" method="post" action="{{ url_for('add_break_idea') }}" hidden>
+        <label>Activity name<input name="name" type="text" maxlength="100" required placeholder="Try a new guitar riff"></label>
+        <div class="fields">
+          <label>Time needed (minutes)<input name="minutes" type="number" min="5" max="240" step="1" required placeholder="20"></label>
+          <label>Category<select name="category"><option>Wellness</option><option>Study</option><option>Career</option><option>Music</option><option>Social</option><option>Other</option></select></label>
+        </div>
+        <label>Note (optional)<input name="note" type="text" maxlength="200" placeholder="Anything you want to remember"></label>
+        <button class="add" type="submit">Save idea</button>
+      </form>
+      {% if next_break %}
+        <p class="hint">{{ next_break[0].strftime('%a %b %d, %I:%M %p') }}–{{ next_break[1].strftime('%I:%M %p') }} · Swipe through activities that fit this break.</p>
+      {% else %}<p class="hint">Ideas that fit your next free block after scheduled tasks.</p>{% endif %}
+      {% if calendar %}
+        {% if free_time_ideas %}
+          <div class="idea-carousel" id="idea-carousel" tabindex="0" aria-label="Free time ideas">
+            {% for idea in free_time_ideas %}
+              <div class="idea-slide" {% if not loop.first %}hidden{% endif %}>
+                <h3>{{ idea.name }}</h3>
+                <p class="small">{{ idea.minutes }} min · {{ idea.start.strftime('%a %b %d, %I:%M %p') }}–{{ idea.end.strftime('%I:%M %p') }}</p>
+                {% if idea.note %}<p class="small">{{ idea.note }}</p>{% endif %}
+              </div>
+            {% endfor %}
+            {% if free_time_ideas|length > 1 %}
+              <div class="idea-controls">
+                <button type="button" id="idea-prev" aria-label="Previous idea">← Previous</button>
+                <span id="idea-count" aria-live="polite">1 of {{ free_time_ideas|length }}</span>
+                <button type="button" id="idea-next" aria-label="Next idea">Next →</button>
+              </div>
+            {% endif %}
+          </div>
+        {% elif next_break %}<p class="small">No activity in your ideas list fits this break.</p>
+        {% else %}<p class="small">No free break remains in the next seven days.</p>{% endif %}
+      {% else %}<div class="notice">{{ calendar_error }}</div>{% endif %}
+    </section>
+
+    <section class="card compact-card">
+      <h2>the next event is...</h2>
+      {% if calendar and calendar.next_special_event %}
+        <b>{{ calendar.next_special_event.title }}</b>
+        <p class="hint">{{ calendar.next_special_event.start.strftime('%a, %b %d') }}{% if calendar.next_special_event.all_day %} · All day{% else %} · {{ calendar.next_special_event.start.strftime('%I:%M %p') }}{% endif %}</p>
+      {% elif calendar %}<p class="hint">No upcoming birthdays, holidays, or all-day events this week.</p>
+      {% else %}<p class="hint">Calendar events will appear here once connected.</p>{% endif %}
+    </section>
+
+    <section class="card compact-card">
+      <h2>AI recommendation</h2>
+      <p class="hint">Priority preview using a clear scoring rule. This ranking does not change the schedule yet.</p>
+      {% if priorities %}
+      <div class="priority-result"><b>{{ priorities[0].task.name }}</b><span class="score">{{ priorities[0].score }}/100</span></div>
+      <p class="small">{% if priorities[0].task.course %}{{ priorities[0].task.course }} · {% endif %}{{ priorities[0].urgency }} · Importance {{ priorities[0].task.importance }}/5 · Difficulty {{ priorities[0].task.difficulty }}/5 · {{ priorities[0].task.hours }} h of work</p>
+      {% if priorities|length > 1 %}<p class="small">Next: {{ priorities[1].task.name }} ({{ priorities[1].score }})</p>{% endif %}
+      {% else %}<p class="small">No unfinished tasks are ready to work on.</p>{% endif %}
+      <p class="small">Score: 40% importance, 35% deadline urgency, 15% difficulty, 10% workload.</p>
+    </section>
+
+    <section class="card">
+      <h2>Upcoming tasks</h2>
+      <p class="hint">Choose the tasks you've finished, then press Update.</p>
+      {% if tasks %}
+      <form method="post" action="{{ url_for('update_task_completion') }}" id="completion-form">
+      <ul class="tasks list-scroll" aria-label="Upcoming tasks, scroll for more">
+        {% for task in tasks %}
+        <li class="task {% if task.completed %}done{% endif %}">
+          <input type="hidden" name="task_id" value="{{ task.id }}">
+          <input class="check" type="checkbox" name="completed" value="{{ task.id }}" {% if task.completed %}checked{% endif %} aria-label="Completed: {{ task.name }}">
+          <div class="t">
+            <b>{{ task.name }}</b>
+            <div class="meta">
+              <span class="pill {{ task.priority|lower }}">{{ task.priority }}</span>
+              {% if task.course %}<span class="pill course-pill">{{ task.course }}</span>{% endif %}
+              <span>Due {{ task.due_label }}</span>
+              <span>· {{ task.hours }} h</span>
+              {% if task.repeating %}<span>· Repeats weekly</span>{% endif %}
+            </div>
+          </div>
+          {% if task.sheet_task %}<span class="small">From Sheets</span>
+          {% else %}<a class="edit-link" href="{{ url_for('edit_task', task_id=task.edit_id) }}">Edit</a>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <div class="task-actions"><button class="add" type="submit">Update tasks</button><span class="small" id="task-changes" aria-live="polite">Select one or more tasks to update.</span></div>
+      </form>
+      {% else %}<p class="small">No tasks yet. Add your first one here.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Add a task</h2>
+      <p class="hint">Choose a one-time deadline or a weekly weekday and due time.</p>
+      <form class="task-form" method="post" action="{{ url_for('add_task') }}">
+        <label>Task name<input name="name" type="text" maxlength="150" required placeholder="Study for finance exam"></label>
+        <div class="fields">
+          <label>Hours needed<input name="hours" type="number" min="0.25" step="0.25" required placeholder="2"></label>
+          <label>Importance<select name="importance"><option value="3">3 · Medium</option><option value="1">1 · Low</option><option value="2">2 · Low</option><option value="4">4 · High</option><option value="5">5 · High</option></select></label>
+        </div>
+        <label>Difficulty (1 easy, 5 hard)<select name="difficulty"><option value="3">3 · Moderate</option><option value="1">1 · Very easy</option><option value="2">2 · Easy</option><option value="4">4 · Hard</option><option value="5">5 · Very hard</option></select></label>
+        <label>Repeat<select name="repeat" id="add-repeat"><option value="once">One-time</option><option value="weekly">Weekly</option></select></label>
+        <label id="add-once">Deadline<input name="deadline" type="datetime-local" required></label>
+        <div id="add-weekly" class="fields" hidden>
+          <label>Every<select name="weekday" disabled>{% for weekday in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday') %}<option value="{{ weekday }}">{{ weekday }}</option>{% endfor %}</select></label>
+          <label>Due by<input name="due_time" type="time" value="21:00" disabled></label>
+        </div>
+        <button class="add" type="submit">Add task</button>
+      </form>
+    </section>
+
+    <section class="card span">
+      <h2>Assignments from Google Sheets</h2>
+      <p class="hint">Exam study starts 14 days before it is due; projects start 7 days before, homework 2 days before. Econ exams stay in this list without a study task. New rows load when you refresh the dashboard.</p>
+      <form class="task-form" method="post" action="{{ url_for('configure_sheet') }}">
+        <label>Google Sheets link<input name="url" type="url" required placeholder="https://docs.google.com/spreadsheets/d/..." value="{{ 'https://docs.google.com/spreadsheets/d/' ~ sheet_config.sheet_id ~ '/edit' if sheet_config.sheet_id else '' }}"></label>
+        <div class="fields">
+          <label>Worksheet tab (optional)<input name="tab" type="text" value="{{ sheet_config.tab or '' }}" placeholder="Assignments"></label>
+          <label style="align-self:end"><button class="add" type="submit">{{ 'Update sheet' if sheet_config.sheet_id else 'Connect sheet' }}</button></label>
+        </div>
+      </form>
+      {% if sheet_error %}<div class="error" role="alert">{{ sheet_error }}</div>{% endif %}
+      {% if assignments %}
+        <ul class="assignment-list list-scroll" style="margin-top:16px" aria-label="Assignments, scroll for more">
+          {% for assignment in assignments %}
+            <li>
+              <b>{{ assignment.title }}</b>
+              <div class="meta">
+                <span class="pill {{ 'high' if assignment.type == 'Exam' else 'med' if assignment.type == 'Project' else 'low' }}">{{ assignment.type }}</span>
+                {% if assignment.course %}<span>{{ assignment.course }}</span>{% endif %}
+                <span>Due {{ assignment.due.strftime('%a %b %d at %I:%M %p') }}</span>
+                {% if assignment.prep_required %}<span>Prep starts {{ assignment.prep_start.strftime('%b %d') }}</span>
+                {% else %}<span>No study task for Econ exam</span>{% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% elif sheet_config.sheet_id and not sheet_error %}<p class="small">No upcoming incomplete assignments found in this sheet.</p>
+      {% else %}<p class="small">The sheet needs columns named Assignment (or Title) and Due Date. Course, Type, and Status are optional.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2 id="schedule-heading">Today's schedule</h2>
+      <p class="hint">Events from your primary Google Calendar and open time within your work hours</p>
+      {% if calendar %}
+        <div class="schedule-controls">
+          <button type="button" id="schedule-prev" disabled>← Previous</button>
+          <span id="schedule-day-label">{{ calendar.days[0].date.strftime('%A, %b %d') }}</span>
+          <button type="button" id="schedule-next">Next →</button>
+        </div>
+        {% for day in calendar.days %}
+        <div class="schedule-day" data-heading="{{ day.schedule_label }}" data-date="{{ day.date.strftime('%A, %b %d') }}" {% if not loop.first %}hidden{% endif %}>
+        {% if day.timeline %}
+          <div class="schedule-scroll" tabindex="0" aria-label="{{ day.schedule_label }}, scroll for more">
+          <ul class="timeline">
+            {% for item in day.timeline %}
+              <li><time>{{ item.start.strftime('%I:%M %p') }}</time>
+                <div class="event {{ item.kind }}" {% if item.kind == 'calendar' %}style="--event-color:{{ item.color }}"{% endif %}>
+                  <b>{{ item.title }}</b>
+                  <small>{{ item.start.strftime('%I:%M %p') }}–{{ item.end.strftime('%I:%M %p') }}{% if item.detail %} · {{ item.detail }}{% endif %}</small>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+          </div>
+        {% else %}<p class="small">No calendar events or free work blocks for this day.</p>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}<div class="notice">{{ calendar_error }}</div>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Free time this week</h2>
+      <p class="hint">After events in your primary Google Calendar · today's work window: {{ work_window }}</p>
+      {% if calendar %}
+        <div class="window">{{ '%.1f'|format(calendar.week_free_hours) }} h</div>
+        <p class="small">Available during the next seven days</p>
+        <div class="free-pair">
+          {% for day in calendar.days[:2] %}
+            <div class="free-detail">
+              <b>{{ 'Free time today' if loop.first else 'Free time tomorrow' }}</b>
+              <strong>{{ '%.1f'|format(day.hours) }} h</strong>
+              <small>{{ day.date.strftime('%a, %b %d') }} · {% if day.blocks %}{{ day.blocks|length }} open block{{ 's' if day.blocks|length != 1 else '' }}{% else %}No open blocks{% endif %}</small>
+              {% if day.blocks %}<ul>{% for start, end in day.blocks[:3] %}<li>{{ start.strftime('%I:%M %p') }}–{{ end.strftime('%I:%M %p') }}</li>{% endfor %}{% if day.blocks|length > 3 %}<li>+ {{ day.blocks|length - 3 }} more</li>{% endif %}</ul>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="week">
+          {% for day in calendar.days %}
+            <div class="day">
+              <div class="col"><i style="height:{{ (day.hours / 13 * 100)|round|int }}%"></i></div>
+              {{ day.label }}<br>{{ '%.1f'|format(day.hours) }}h
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}<div class="notice">Your work hours are loaded. Calendar availability will appear after the connection loads.</div>{% endif %}
+    </section>
+  </div>
+</div>
+<script>
+  const completionForm = document.getElementById('completion-form');
+  if (completionForm) {
+    completionForm.querySelectorAll('input.check').forEach(check => {
+      check.addEventListener('change', () => {
+        check.closest('.task').classList.toggle('done', check.checked);
+        document.getElementById('task-changes').textContent = 'Changes ready to save.';
+      });
+    });
+  }
+  const scheduleDays = [...document.querySelectorAll('.schedule-day')];
+  if (scheduleDays.length) {
+    let selectedDay = 0;
+    const previous = document.getElementById('schedule-prev');
+    const next = document.getElementById('schedule-next');
+    function showSchedule(index) {
+      selectedDay = Math.max(0, Math.min(index, scheduleDays.length - 1));
+      scheduleDays.forEach((day, i) => { day.hidden = i !== selectedDay; });
+      const visible = scheduleDays[selectedDay];
+      document.getElementById('schedule-heading').textContent = visible.dataset.heading;
+      document.getElementById('schedule-day-label').textContent = visible.dataset.date;
+      previous.disabled = selectedDay === 0;
+      next.disabled = selectedDay === scheduleDays.length - 1;
+      visible.querySelector('.schedule-scroll')?.scrollTo(0, 0);
+    }
+    previous.addEventListener('click', () => showSchedule(selectedDay - 1));
+    next.addEventListener('click', () => showSchedule(selectedDay + 1));
+  }
+  const ideaAddToggle = document.getElementById('idea-add-toggle');
+  const ideaAddForm = document.getElementById('idea-add-form');
+  ideaAddToggle.addEventListener('click', () => {
+    ideaAddForm.hidden = !ideaAddForm.hidden;
+    ideaAddToggle.setAttribute('aria-expanded', String(!ideaAddForm.hidden));
+    if (!ideaAddForm.hidden) ideaAddForm.querySelector('input').focus();
+  });
+  const repeatSelect = document.getElementById('add-repeat');
+  function updateAddFrequency() {
+    const weekly = repeatSelect.value === 'weekly';
+    document.getElementById('add-once').hidden = weekly;
+    document.getElementById('add-weekly').hidden = !weekly;
+    document.querySelector('#add-once input').disabled = weekly;
+    document.querySelector('#add-weekly select').disabled = !weekly;
+    document.querySelector('#add-weekly input').disabled = !weekly;
+  }
+  repeatSelect.addEventListener('change', updateAddFrequency);
+  updateAddFrequency();
+  const carousel = document.getElementById('idea-carousel');
+  if (carousel) {
+    const slides = [...carousel.querySelectorAll('.idea-slide')];
+    const count = document.getElementById('idea-count');
+    let current = 0;
+    function showIdea(index) {
+      current = (index + slides.length) % slides.length;
+      slides.forEach((slide, i) => { slide.hidden = i !== current; });
+      if (count) count.textContent = `${current + 1} of ${slides.length}`;
+    }
+    document.getElementById('idea-prev')?.addEventListener('click', () => showIdea(current - 1));
+    document.getElementById('idea-next')?.addEventListener('click', () => showIdea(current + 1));
+    carousel.addEventListener('keydown', event => {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        showIdea(current + (event.key === 'ArrowRight' ? 1 : -1));
+      }
+    });
+    let touchStart = null;
+    carousel.addEventListener('touchstart', event => {
+      const touch = event.changedTouches[0];
+      touchStart = { x: touch.clientX, y: touch.clientY };
+    }, { passive: true });
+    carousel.addEventListener('touchend', event => {
+      if (!touchStart) return;
+      const touch = event.changedTouches[0];
+      const dx = touch.clientX - touchStart.x;
+      const dy = touch.clientY - touchStart.y;
+      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+        showIdea(current + (dx < 0 ? 1 : -1));
+      }
+      touchStart = null;
+    }, { passive: true });
+  }
+</script>
+</body>
+</html>
