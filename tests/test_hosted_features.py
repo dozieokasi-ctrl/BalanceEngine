@@ -192,3 +192,13 @@ class HostedFeaturesTests(unittest.TestCase):
             event=upcoming_events('token',zone,now)[0]
         self.assertEqual((event['start'].day,event['start'].hour),(29,21))
         self.assertEqual(event['color'],'#0088aa')
+
+    def test_privacy_page_is_public_and_linked_from_home(self):
+        response = self.client.get('/privacy')
+        self.assertEqual(response.status_code,200)
+        self.assertIn(b'Privacy policy',response.data)
+        self.assertIn(b'Google API Services User Data Policy',response.data)
+        self.assertIn(b'dozieokasi@gmail.com',response.data)
+        home = self.client.get('/').data
+        self.assertIn(b'href="/privacy"',home)
+        self.assertNotIn(b'Sheets is coming later',home)

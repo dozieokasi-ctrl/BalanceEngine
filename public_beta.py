@@ -250,6 +250,10 @@ def create_app(test_config=None):
         db().execute("SELECT 1").fetchone()
         return "ok"
 
+    @app.get("/privacy")
+    def privacy():
+        return render_template("public/privacy.html")
+
     @app.get("/demo")
     def demo():
         now = datetime.now(timezone.utc)

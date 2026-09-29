@@ -1,0 +1,37 @@
+{% extends 'public/base.html' %}
+{% block title %}Privacy policy · BalanceEngine{% endblock %}
+{% block content %}
+<main class="card stack" style="max-width:800px;margin:32px auto;line-height:1.7">
+  <h1>Privacy policy</h1>
+  <p class="muted">Last updated: September 29, 2026</p>
+  <p>BalanceEngine is a scheduling and task-planning beta operated by Nnadozie Okasi. This page explains the information the hosted service accesses, how it uses that information, and the choices available to you. Questions and privacy requests can be sent to <a href="mailto:dozieokasi@gmail.com">dozieokasi@gmail.com</a>.</p>
+
+  <section><h2>Information you provide</h2>
+  <p>When you create an account, we store your email address, a hash of your password, and account creation information. We store tasks, deadlines, estimated work hours, priority and difficulty settings, completion information, weekly recurrence settings, work windows, timezone, and any break ideas you save. We also record failed login attempts to limit repeated attempts.</p>
+  <p>Your browser can supply its timezone to set up your account when a local timezone has not yet been chosen. You can change your timezone in Settings. The public demo uses example data; it does not display another user's private tasks or Google information.</p></section>
+
+  <section><h2>Optional Google connections</h2>
+  <p>Google Calendar and Google Sheets are optional and require your authorization. BalanceEngine does not receive your Google password.</p>
+  <p>For Calendar, we read events from your primary calendar, including titles, start and end times, locations, all-day status, availability status, and colors. We also read the primary calendar's color from your calendar list. We use this information to display your schedule, identify busy and free periods, and suggest times for tasks and breaks. Calendar events are processed when the dashboard loads; this version does not save a separate event history in its account database.</p>
+  <p>For Sheets, we store the spreadsheet identifier and worksheet name you choose, read rows from that worksheet, and process assignment titles, due dates, courses, assignment types, and completion status when those fields are present. We display upcoming assignments and save generated preparation tasks in your account. The read-only permission granted by Google can cover spreadsheets you can access, but the app requests the worksheet you configure, rather than browsing or copying all of your spreadsheets.</p>
+  <p>Both integrations are read-only: BalanceEngine does not edit your Calendar events or spreadsheet rows. We store encrypted Google refresh tokens so the app can refresh access without asking you to sign in on every visit. Access tokens are used to make requests to Google.</p></section>
+
+  <section><h2>How information is used and shared</h2>
+  <p>Information is used to operate your account, provide scheduling and assignment features, protect the service, troubleshoot problems, and respond to support requests. Saved records are associated with your account and are not shown to other users.</p>
+  <p>The current recommendation feature uses a scoring rule within the application. Your tasks, Calendar events, and Sheets data are not sent to an external generative AI service or used to train AI models. We do not sell personal information or use Google user data for advertising.</p>
+  <p>Render provides hosting and storage for the service and processes information needed to operate it. Google processes authorization and API requests under its own policies. Information may be accessed by the operator when necessary for support, security, or maintenance, or disclosed when required by applicable law. Information is not shared with unrelated third parties for their own marketing.</p>
+  <p>BalanceEngine's use and transfer of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including its Limited Use requirements.</p></section>
+
+  <section><h2>Cookies, logs, and protection</h2>
+  <p>Essential session cookies maintain your login and help protect forms from unauthorized requests. The current application does not include advertising cookies or third-party analytics scripts. The server and hosting provider may keep operational logs containing request details, timestamps, network information, and error information.</p>
+  <p>Passwords are hashed, saved Google tokens are encrypted, and production connections use HTTPS. These measures reduce risk, but no service can guarantee absolute security.</p></section>
+
+  <section><h2>Retention, disconnecting, and deletion</h2>
+  <p>Account settings, saved tasks, break ideas, spreadsheet configuration, and connection tokens remain stored until deleted through available controls or by the operator following a verified request. Completed tasks may stop appearing on the dashboard without being deleted from storage.</p>
+  <p>You can edit or delete tasks and disconnect Google integrations in the app. Disconnecting Calendar removes its saved connection token. Disconnecting Sheets removes its saved connection token, spreadsheet configuration, and imported preparation tasks. Disconnecting one integration does not necessarily revoke all Google permissions for the other. To revoke Google access entirely, use <a href="https://myaccount.google.com/connections">your Google Account connections settings</a>. Revoking access at Google does not automatically delete your BalanceEngine account or saved tasks.</p>
+  <p>For account deletion or a copy of your saved information, email <a href="mailto:dozieokasi@gmail.com">dozieokasi@gmail.com</a> from your registered email address. We may request additional verification before acting. Deletion from the active database does not necessarily immediately remove information from hosting logs or any retained backup copies; their retention depends on the hosting configuration and applicable obligations.</p></section>
+
+  <section><h2>Changes and contact</h2>
+  <p>As the beta changes, we may update this policy. The date above identifies the latest version. For questions about a change or any privacy request, contact <a href="mailto:dozieokasi@gmail.com">dozieokasi@gmail.com</a>.</p></section>
+</main>
+{% endblock %}
