@@ -65,8 +65,8 @@ def create_app(test_config=None):
     production = not (app.config.get("TESTING") or os.getenv("BALANCEENGINE_ENV") == "development")
     secret = app.config.get("SECRET_KEY") or os.getenv("SECRET_KEY")
     data_dir = Path(app.config.get("DATA_DIR") or os.getenv("DATA_DIR", "instance")).resolve()
-    if production and (not secret or not os.getenv("SIGNUP_CODE") or not os.getenv("DATA_DIR")):
-        raise RuntimeError("Production needs SECRET_KEY, SIGNUP_CODE, and persistent DATA_DIR.")
+    if production and (not secret or not os.getenv("DATA_DIR")):
+        raise RuntimeError("Production needs SECRET_KEY and persistent DATA_DIR.")
     if not secret:
         secret = secrets.token_hex(32)
     app.secret_key = secret
@@ -283,10 +283,7 @@ def create_app(test_config=None):
         if request.method == "POST":
             email = request.form.get("email", "").strip().lower()
             password = request.form.get("password", "")
-            required_code = app.config.get("SIGNUP_CODE") or os.getenv("SIGNUP_CODE", "")
-            if required_code and not hmac.compare_digest(request.form.get("signup_code", ""), required_code):
-                flash("Invalid beta invitation code.", "error")
-            elif len(email) > 254 or "@" not in email or not email.partition("@")[2] or len(password) < 12 or len(password) > 256:
+            if len(email) > 254 or "@" not in email or not email.partition("@")[2] or len(password) < 12 or len(password) > 256:
                 flash("Enter a valid email and a password of 12–256 characters.", "error")
             else:
                 user_id = str(uuid4())
@@ -305,7 +302,7 @@ def create_app(test_config=None):
                     session.clear()
                     session["user_id"] = user_id
                     return redirect(url_for("settings"))
-        return render_template("public/auth.html", mode="register", invite_required=bool(app.config.get("SIGNUP_CODE") or os.getenv("SIGNUP_CODE")))
+        return render_template("public/auth.html", mode="register")
 
     @app.route("/login", methods=["GET", "POST"])
     def login():

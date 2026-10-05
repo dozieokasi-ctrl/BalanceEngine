@@ -14,5 +14,3 @@ services:
         value: /app/data
       - key: SECRET_KEY
         generateValue: true
-      - key: SIGNUP_CODE
-        sync: false

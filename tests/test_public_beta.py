@@ -69,10 +69,9 @@ class PublicBetaTests(unittest.TestCase):
         self.post(f"/tasks/{task_id}/delete", {})
         self.assertNotIn(b"Private assignment", self.client.get("/dashboard").data)
 
-    def test_invite_code_and_login(self):
-        bad = self.post("/register", {"email": "one@example.com", "password": "long-test-password", "signup_code": "wrong"})
-        self.assertIn(b"Invalid beta invitation code", bad.data)
-        self.register("one@example.com")
+    def test_open_signup_and_login(self):
+        self.assertNotIn(b"Invitation code", self.client.get("/register").data)
+        self.assertEqual(self.post("/register", {"email": "one@example.com", "password": "long-test-password"}).status_code, 302)
         self.post("/logout", {})
         self.assertEqual(self.client.get("/dashboard").status_code, 302)
         self.post("/login", {"email": "one@example.com", "password": "long-test-password"})
