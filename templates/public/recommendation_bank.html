@@ -1,0 +1,32 @@
+{% extends 'public/base.html' %}
+{% block title %}Saved recommendations · BalanceEngine{% endblock %}
+{% block content %}
+<main>
+<h1>Saved recommendations</h1>
+<p class="muted">Your personal bank of break activities. All saved activities stay here; Next break suggests only those that fit your available time.</p>
+<p><a href="{{ url_for('dashboard') }}">← Back to dashboard</a></p>
+<section class="card"><h2>Add an activity</h2>
+<form class="stack" method="post" action="{{ url_for('save_bank_idea') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<label>Activity<input name="name" required maxlength="100" placeholder="Practice guitar"></label>
+<label>Minutes<input name="minutes" type="number" min="1" max="240" required value="20"></label>
+<label>Category<select name="category">{% for category in categories %}<option>{{ category }}</option>{% endfor %}</select></label>
+<label>Note (optional)<input name="note" maxlength="200"></label>
+<button class="button">Save activity</button></form></section>
+<section class="card"><h2>Your bank · {{ ideas|length }}</h2>
+{% for idea in ideas %}<article style="padding:16px 0;border-bottom:1px solid #343958">
+<h3>{{ idea.name }}</h3><p class="muted">{{ idea.minutes }} min · {{ idea.category }}</p>{% if idea.note %}<p>{{ idea.note }}</p>{% endif %}
+<details><summary>Edit activity</summary>
+<form class="stack" method="post" action="{{ url_for('save_bank_idea') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="id" value="{{ idea.id }}">
+<label>Activity<input name="name" value="{{ idea.name }}" required maxlength="100"></label>
+<label>Minutes<input name="minutes" type="number" min="1" max="240" value="{{ idea.minutes }}" required></label>
+<label>Category<select name="category">{% for category in categories %}<option {% if category == idea.category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select></label>
+<label>Note<input name="note" value="{{ idea.note }}" maxlength="200"></label><button class="button">Save changes</button></form></details>
+<form method="post" action="{{ url_for('delete_bank_idea', idea_id=idea.id) }}" style="margin-top:12px"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button>Delete activity</button></form>
+</article>{% else %}<p>No saved activities yet. Add an activity or import your own list below.</p>{% endfor %}</section>
+<section class="card"><h2>Import your activities</h2><p class="muted">Paste your own list. It is saved only to your account. Use one activity per line: Activity name | minutes.</p>
+<form class="stack" method="post" action="{{ url_for('import_bank_ideas') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<label>Your activities<textarea name="activities" rows="8" required maxlength="12000" placeholder="Activity name | 20"></textarea></label>
+<button class="button">Import to my bank</button></form></section>
+</main>{% endblock %}

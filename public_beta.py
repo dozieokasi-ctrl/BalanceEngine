@@ -641,6 +641,9 @@ def create_app(test_config=None):
         flash('Sheets disconnected and imported preparation tasks removed.','success')
         return redirect(url_for('settings'))
 
+    from recommendation_bank import register_recommendation_bank
+    register_recommendation_bank(app, db, login_required)
+
     return app
 
 

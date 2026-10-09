@@ -44,6 +44,7 @@
         <h2>For your next break...</h2>
         <button class="plus-button" type="button" id="idea-add-toggle" aria-label="Add a break idea" aria-expanded="false" aria-controls="idea-add-form">+</button>
       </div>
+      {% if not demo %}<p class="hint"><a href="{{ url_for('recommendation_bank') }}">View saved recommendations</a></p>{% endif %}
       <form id="idea-add-form" class="idea-form" method="post" action="{{ url_for('add_break_idea') }}" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><fieldset style="display:contents" {% if demo %}disabled{% endif %}>
         <label>Activity name<input name="name" type="text" maxlength="100" required placeholder="Try a new guitar riff"></label>
         <div class="fields">
